@@ -1,4 +1,4 @@
-Oracle-SQLLoader version 0.1
+Oracle-SQLLoader README
 =============================
 
 OVERVIEW
@@ -28,7 +28,12 @@ SUPPORTED PLATFORMS
 
 Oracle::SQLLoader has been successfully tested on the following platforms:
 
-* Oracle 9.2.1.0 on Solaris and Linux
+* Oracle 9.2.1.0 on Solaris 8 and 9
+* Oracle 9.2.1.0 on Debian GNU/Linux testing
+* Oracle 10.1.0.2 on Windows XP and Enterprise Server 2003
+
+If you try this module on any other platforms, any success or failure report
+would be greatly appreciated.
 
 
 INSTALLATION
@@ -77,4 +82,4 @@ file, but in the event that I do, I'll add it to the module; patches and
 contributions welcome!
 
 
-$Id: README,v 1.7 2004/09/04 03:44:48 ezra Exp $
+$Id: README,v 1.9 2004/09/06 21:58:28 ezra Exp $

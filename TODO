@@ -2,7 +2,7 @@
 want to know if the instance is down (SQL*Loader-128), or if the table does
 not exist (SQL*Loader-941) SQL*Loader-101
 
-* win32 support
+* win32 ppm
 
 * par file support
 
@@ -23,5 +23,8 @@ not exist (SQL*Loader-941) SQL*Loader-101
 * if we can get a DBI connection, we can just pull the column specs out of
   USER_TAB_COLUMNS
 
+* move Tables and Columns out into classes
 
-$Id: TODO,v 1.4 2004/09/04 03:44:48 ezra Exp $
+* since we can parse out unusable indexes, what should we do w/ them, rebuild?
+
+$Id: TODO,v 1.6 2004/09/06 21:59:09 ezra Exp $

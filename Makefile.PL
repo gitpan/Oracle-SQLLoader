@@ -1,11 +1,11 @@
-# $Id: Makefile.PL,v 1.4 2004/09/03 17:06:59 ezra Exp $
+# $Id: Makefile.PL,v 1.5 2004/09/06 21:44:55 ezra Exp $
 # -*- mode: cperl -*-
 
 use 5.00503;
 use ExtUtils::MakeMaker;
 use Config;
 
-my $SQLLDRBIN = 'sqlldr';
+my $SQLLDRBIN = $^O =~ /win32/i ? 'sqlldr.exe' : 'sqlldr';
 
 # make sure that sqlldr is somewhere in our path.
 findSqlldr();
@@ -26,15 +26,22 @@ WriteMakefile(
 
 
 sub findSqlldr{
+  
   print "Searching for SQL*Loader executable ($SQLLDRBIN)\n";
   if (exists $ENV{'ORACLE_HOME'}) {
     if (-x "$ENV{'ORACLE_HOME'}/bin/$SQLLDRBIN") {
       print "Found SQL*Loader executable in $ENV{'ORACLE_HOME'}/bin\n";
       return 1;
     }
+    else {
+      print "Found ORACLE_HOME environment variable ($ENV{'ORACLE_HOME'}), ".
+            "but failed to find SQL*Loader executable ($SQLLDRBIN)\n";
+      if (not ExtUtils::MakeMaker::prompt("Search the rest of your PATH? " => 'Y') =~ /^\s*y/i) {
+        exit;
+      }
+    }
   }
-  print "You don't have an ORACLE_HOME set in your environment. Searching \n".
-    "your PATH for the sqlldr executable....\n";
+  print "Searching your PATH for the sqlldr executable....\n";
 
   foreach (split($Config{'path_sep'}, $ENV{'PATH'})) {
     if (-x "$_/$SQLLDRBIN") {

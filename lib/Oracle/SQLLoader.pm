@@ -1,5 +1,5 @@
 # -*- mode: cperl -*-
-# $Id: SQLLoader.pm,v 1.24 2004/09/05 06:47:43 ezra Exp $
+# $Id: SQLLoader.pm,v 1.32 2004/09/06 21:59:09 ezra Exp $
 
 =head1 NAME
 
@@ -43,10 +43,23 @@ stats and return codes by parsing the sqlldr output.
 
   # stats
   $skipped = $ldr->getNumberSkipped();
+
   $read = $ldr->getNumberRead();
+
   $rejects = $ldr->getNumberRejected();
+
   $discards = $ldr->getNumberDiscarded();
+
   $loads = $ldr->getNumberLoaded();
+
+  $beginTS = $ldr->getLoadBegin();
+
+  $endTS = $ldr->getLoadEnd();
+
+  $runtimeSecs = $ldr->getElapsedSeconds();
+
+  $secsOnCpu = $ldr->getCpuSeconds();
+
 
 
 
@@ -81,11 +94,23 @@ stats and return codes by parsing the sqlldr output.
   $flldr->executeLoader() || warn "Problem executing sqlldr: $@\n";
 
   # stats
-  $skipped = $flldr->getNumberSkipped();
-  $read = $flldr->getNumberRead();
-  $rejects = $flldr->getNumberRejected();
-  $discards = $flldr->getNumberDiscarded();
-  $loads = $flldr->getNumberLoaded();
+  $skipped = $ldr->getNumberSkipped();
+
+  $read = $ldr->getNumberRead();
+
+  $rejects = $ldr->getNumberRejected();
+
+  $discards = $ldr->getNumberDiscarded();
+
+  $loads = $ldr->getNumberLoaded();
+
+  $beginTS = $ldr->getLoadBegin();
+
+  $endTS = $ldr->getLoadEnd();
+
+  $runtimeSecs = $ldr->getElapsedSeconds();
+
+  $secsOnCpu = $ldr->getCpuSeconds();
 
 
 =head1 AUTHOR
@@ -128,15 +153,23 @@ use vars qw/@ISA
 
 
 
-$VERSION = '0.2';
+$VERSION = '0.3';
 @ISA = qw/Exporter/;
 @EXPORT_OK = qw/$CHAR $INT $DECIMAL $DATE $APPEND $TRUNCATE $REPLACE $INSERT/;
 
 
+################################################################################
+
+=head1 API
+
+=cut
 
 ################################################################################
 
-=head1 Importable Variables
+
+################################################################################
+
+=head2 IMPORTABLE VARIABLES
 
 =over 2
 
@@ -185,7 +218,7 @@ $REPLACE = 'REPLACE';
 $INSERT = 'INSERT';
 
 # what's the name of the sqlldr executable?
-my $SQLLDRBIN = 'sqlldr';
+my $SQLLDRBIN = $^O =~ /win32/i ? 'sqlldr.exe' : 'sqlldr';
 
 # used to determine start/end epochs from logs
 my %MONTHS = (Jan => 0, Feb => 1, Mar => 2, Apr => 3, May => 4, Jun => 5,
@@ -195,7 +228,7 @@ my $DEBUG = 0;
 
 ################################################################################
 
-=head1 Public Methods
+=head2 PUBLIC METHODS
 
 =cut
 
@@ -206,7 +239,7 @@ my $DEBUG = 0;
 
 ################################################################################
 
-=head2 B<new()>
+=head3 B<new()>
 
 create a new Oracle::SQLLoader object
 
@@ -321,7 +354,7 @@ sub new {
 
 ###############################################################################
 
-=head2 B<addTable()>
+=head3 B<addTable()>
 
 identify a table to be loaded. multiple adds with the same table name clobbers
 any old definition.
@@ -375,7 +408,7 @@ sub addTable {
 
 ###############################################################################
 
-=head2 B<addColumn()>
+=head3 B<addColumn()>
 
 add a column to be loaded
 
@@ -499,7 +532,7 @@ sub addColumn {
 
 ################################################################################
 
-=head2 B<executeLoader()>
+=head3 B<executeLoader()>
 
 generate a control file and execute an sqlldr job. this is a blocking call. if
 you don't care about load statistics, you can always fork it off.
@@ -539,7 +572,7 @@ sub executeLoader {
 
 ################################################################################
 
-=head2 B<checkLogfile()>
+=head3 B<checkLogfile()>
 
 parse an sqlldr logfile and be store results in object status
 
@@ -625,6 +658,9 @@ sub checkLogfile {
     elsif(/CPU time was:\s+(\d+):(\d{2}):(\d{2})\.\d{2}/) {
       $self->{'_stats'}{'cpu_seconds'} = (3600 * $1) + (60 * $2) + $3;
     }
+    # what to do w/ trashed indexes, force rebuild?
+    elsif (/index\s(\w+\.\w+)\swas made unusable/) {
+    }
   }
 
   $self->{'_stats'}{'skipped'} ||= 0;
@@ -644,7 +680,7 @@ sub checkLogfile {
 
 ###############################################################################
 
-=head1 Status Methods
+=head2 STATUS METHODS
 
 =cut
 
@@ -655,7 +691,7 @@ sub checkLogfile {
 
 ###############################################################################
 
-=head2 B<getNumberSkipped()>
+=head3 B<getNumberSkipped()>
 
 returns the number of records skipped , or undef if no stats are known
 
@@ -670,7 +706,7 @@ sub getNumberSkipped {
 
 ###############################################################################
 
-=head2 B<getNumberRead()>
+=head3 B<getNumberRead()>
 
 returns the number of read from all input files, or undef if no stats are known
 
@@ -685,7 +721,7 @@ sub getNumberRead {
 
 ###############################################################################
 
-=head2 B<getNumberRejected()>
+=head3 B<getNumberRejected()>
 
 returns the number of records rejected, or undef if no stats are known
 
@@ -700,7 +736,7 @@ sub getNumberRejected {
 
 ###############################################################################
 
-=head2 B<getNumberDiscarded()>
+=head3 B<getNumberDiscarded()>
 
 returns the number of records discarded, or undef if no stats are known
 
@@ -715,7 +751,7 @@ sub getNumberDiscarded {
 
 ###############################################################################
 
-=head2 B<getNumberLoaded()>
+=head3 B<getNumberLoaded()>
 
 returns the number of records successfully loaded, or undef if no stats are
 known
@@ -731,7 +767,7 @@ sub getNumberLoaded {
 
 ###############################################################################
 
-=head2 B<getLastRejectMessage()>
+=head3 B<getLastRejectMessage()>
 
 returns the last known rejection message, if any
 
@@ -745,7 +781,7 @@ sub getLastRejectMessage {
 
 ###############################################################################
 
-=head2 B<getLoadBegin()>
+=head3 B<getLoadBegin()>
 
 the time that the job began represented as epoch timestamp
 
@@ -758,7 +794,7 @@ sub getLoadBegin {
 
 ###############################################################################
 
-=head2 B<getLoadEnd()>
+=head3 B<getLoadEnd()>
 
 the time that the job finished represented as epoch timestamp
 
@@ -772,7 +808,7 @@ sub getLoadEnd {
 
 ###############################################################################
 
-=head2 B<getElapsedSeconds()>
+=head3 B<getElapsedSeconds()>
 
 returns the number if seconds elapsed during load
 
@@ -787,7 +823,7 @@ sub getElapsedSeconds {
 
 ###############################################################################
 
-=head2 B<getCpuSeconds()>
+=head3 B<getCpuSeconds()>
 
 returns the number if seconds on cpu during load
 
@@ -802,7 +838,7 @@ sub getCpuSeconds {
 
 ###############################################################################
 
-=head1 B<Content Generation Methods>
+=head2 B<CONTENT GENERATION METHODS>
 
 =cut
 
@@ -813,10 +849,9 @@ sub getCpuSeconds {
 
 ###############################################################################
 
-=head2 B<generateControlfile()>
+=head3 B<generateControlfile()>
 
-based on the current configuration options, generate a parameter file. the
-generated text is retrievable by calling getParfileText
+based on the current configuration options, generate a control file
 
 =cut
 
@@ -848,9 +883,9 @@ sub generateControlfile {
 
 
   $self->{'_control_text'} = 
-    $self->generateSessionClause().
-    $self->generateTablesClause().
-    $self->generateDataClause();
+    $self->_generateSessionClause().
+    $self->_generateTablesClause().
+    $self->_generateDataClause();
 
   print $fh $self->{'_control_text'};
   $fh->close;
@@ -862,139 +897,11 @@ sub generateControlfile {
 
 
 
-###############################################################################
-
-=head2 B<generateSessionClause()>
-
-TODO
-
-=cut
-
-###############################################################################
-sub generateSessionClause {
-  my $self = shift;
-  my $cfg = $self->{'_cfg_global'};
-  $cfg->{'fixed'} ||= '';
-  my $text = "
-LOAD DATA
-INFILE '$cfg->{'infile'}' $cfg->{'fixed'}
-BADFILE '$cfg->{'badfile'}'
-DISCARDFILE '$cfg->{'discardfile'}'
-$cfg->{'loadmode'}
-";
-
-  return $text;
-} # sub generateSessionClause
-
-
-###############################################################################
-
-=head2 B<generateTablesClause()>
-
-TODO
-
-=cut
-
-###############################################################################
-sub generateTablesClause {
-  my $self = shift;
-  my $tableClause;
-  if (not $self->{'_cfg_tables'}) {
-   croak  __PACKAGE__."::generateTablesClause: no tables defined";
-  }
-
-  foreach my $table (keys %{$self->{'_cfg_tables'}}) {
-
-    my $cfg = $self->{'_cfg_tables'}{$table};
-    $cfg->{'when_clauses'} ||= '';
-
-
-    $tableClause = "\nINTO TABLE $table $cfg->{'when_clauses'} ";
-    if ($self->{'_cfg_global'}{'terminated_by'}) {
-      $tableClause .= "\nfields terminated by '".
-	$self->{'_cfg_global'}{'terminated_by'} ."'";
-    }
-
-    if ($self->{'_cfg_global'}{'enclosed_by'}) {
-      $tableClause .= "\noptionally enclosed by '".
-	$self->{'_cfg_global'}{'enclosed_by'}. "'";
-    }
-
-    if ($self->{'_cfg_global'}{'nullcols'}) {
-      $tableClause .= "\ntrailing nullcols ";
-    }
-    $tableClause .= " (\n";
-
-
-#      "$cfg->{'continue_clauses'}  ".
-
-    my @colDefs;
-    foreach my $def (@{$self->{'_cfg_tables'}{$table}{'columns'}}) {
-      my $colClause;
-
-      $colClause .= $def->{'column_name'} . " ";
-      $colClause .= $def->{'position_spec'} . " " if $def->{'position_spec'};
-      $colClause .= $def->{'column_type'}. " ";
-      $colClause .= $def->{'nullif_clause'}. " " if $def->{'nullif_clause'};
-      $colClause .= $def->{'terminated_clause'}. " " if $def->{'terminated_clause'};
-      $colClause .= $def->{'transform_clause'}. " " if $def->{'transform_clause'};
-      $colClause =~ s/\s+$//g;
-      push @colDefs, "\t$colClause";
-    }
-
-    $tableClause .= join(",\n", @colDefs);
-    $tableClause .= "\n)";
-  }
-
-
-  # after the table clause, we can include optional delimiter or enclosure specs
-
-  return $tableClause;
-} # sub generateTablesClause
-
-
-
-
-###############################################################################
-
-=head2 B<generateDataClause()>
-
-TODO
-
-=cut
-
-###############################################################################
-sub generateDataClause {
-  my $self = shift;
-  return '';
-} # sub generateDataClause
-
-
-
-###############################################################################
-
-=head2 B<generateParfile()>
-
-based on the current configuration options, generate a parameter file. the
-generated text is retrievable by calling getParfileText
-
-=cut
-
-###############################################################################
-sub generateParfile {
-  my $self = shift;
-  my $params = $self->{'_cfg_parfile'};
-  my $parfileText;
-  return $parfileText;
-} # sub generateParfile
-
-
-
 
 
 ################################################################################
 
-=head1 Utility Methods
+=head2 UTILITY METHODS
 
 =cut
 
@@ -1003,7 +910,7 @@ sub generateParfile {
 
 ################################################################################
 
-=head2 B<findProgram()>
+=head3 B<findProgram()>
 
 searches ORACLE_HOME and PATH environment variables for an executable program
 
@@ -1038,7 +945,7 @@ sub findProgram{
 
 ################################################################################
 
-=head2 B<checkEnvironment()>
+=head3 B<checkEnvironment()>
 
 ensure that ORACLE_HOME is set and that the sqlldr binary is present and
 executable
@@ -1060,11 +967,12 @@ sub checkEnvironment {
 
 ################################################################################
 
-=head1 Private Methods
+=head2 PRIVATE METHODS
 
 =cut
 
 ################################################################################
+
 
 ################################################################################
 # setup sane defaults
@@ -1171,9 +1079,119 @@ sub _initDefaults {
 } # sub _initDefaults
 
 
+
 ###############################################################################
 
-=head2 B<_initDescriptions()>
+=head3 B<_generateSessionClause()>
+
+generate the session-wide information for a control file
+
+=cut
+
+###############################################################################
+sub _generateSessionClause {
+  my $self = shift;
+  my $cfg = $self->{'_cfg_global'};
+  $cfg->{'fixed'} ||= '';
+  my $text = "
+LOAD DATA
+INFILE '$cfg->{'infile'}' $cfg->{'fixed'}
+BADFILE '$cfg->{'badfile'}'
+DISCARDFILE '$cfg->{'discardfile'}'
+$cfg->{'loadmode'}
+";
+
+  return $text;
+} # sub _generateSessionClause
+
+
+###############################################################################
+
+=head3 B<_generateTablesClause()>
+
+generate table and column information for a control file
+
+=cut
+
+###############################################################################
+sub _generateTablesClause {
+  my $self = shift;
+  my $tableClause;
+  if (not $self->{'_cfg_tables'}) {
+   croak  __PACKAGE__."::_generateTablesClause: no tables defined";
+  }
+
+  foreach my $table (keys %{$self->{'_cfg_tables'}}) {
+
+    my $cfg = $self->{'_cfg_tables'}{$table};
+    $cfg->{'when_clauses'} ||= '';
+
+
+    $tableClause = "\nINTO TABLE $table $cfg->{'when_clauses'} ";
+    if ($self->{'_cfg_global'}{'terminated_by'}) {
+      $tableClause .= "\nfields terminated by '".
+	$self->{'_cfg_global'}{'terminated_by'} ."'";
+    }
+
+    if ($self->{'_cfg_global'}{'enclosed_by'}) {
+      $tableClause .= "\noptionally enclosed by '".
+	$self->{'_cfg_global'}{'enclosed_by'}. "'";
+    }
+
+    if ($self->{'_cfg_global'}{'nullcols'}) {
+      $tableClause .= "\ntrailing nullcols ";
+    }
+    $tableClause .= " (\n";
+
+
+#      "$cfg->{'continue_clauses'}  ".
+
+    my @colDefs;
+    foreach my $def (@{$self->{'_cfg_tables'}{$table}{'columns'}}) {
+      my $colClause;
+
+      $colClause .= $def->{'column_name'} . " ";
+      $colClause .= $def->{'position_spec'} . " " if $def->{'position_spec'};
+      $colClause .= $def->{'column_type'}. " ";
+      $colClause .= $def->{'nullif_clause'}. " " if $def->{'nullif_clause'};
+      $colClause .= $def->{'terminated_clause'}. " " if $def->{'terminated_clause'};
+      $colClause .= $def->{'transform_clause'}. " " if $def->{'transform_clause'};
+      $colClause =~ s/\s+$//g;
+      push @colDefs, "\t$colClause";
+    }
+
+    $tableClause .= join(",\n", @colDefs);
+    $tableClause .= "\n)";
+  }
+
+
+  # after the table clause, we can include optional delimiter or enclosure specs
+
+  return $tableClause;
+} # sub _generateTablesClause
+
+
+
+
+###############################################################################
+
+=head3 B<_generateDataClause()>
+
+generate any input data for a control file
+
+=cut
+
+###############################################################################
+sub _generateDataClause {
+  my $self = shift;
+  return '';
+} # sub _generateDataClause
+
+
+
+###############################################################################
+
+=head3 B<_initDescriptions()>
 
 this stuff is almost *all* directly from the sqlldr usage dumps
 
