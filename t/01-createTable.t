@@ -1,6 +1,6 @@
 #!/bin/env perl -w
 # -*- mode: cperl -*-
-# $Id: 01-createTable.t,v 1.7 2004/09/11 04:39:24 ezra Exp $
+# $Id: 01-createTable.t,v 1.8 2005/02/16 06:30:49 ezra Exp $
 
 BEGIN {
   unless(grep /blib/, @INC) {
@@ -23,7 +23,7 @@ my $testTableName = "SQLLOADER_TEST_TABLE";
 my $ddlFile = getcwd() . "/$testTableName.sql";
 my $sqlplus = $^O =~/win32/i ? 'sqlplus.exe' : 'sqlplus';
 
-ok(($sqlplus = Oracle::SQLLoader::findProgram($sqlplus)));
+ok(($sqlplus = Oracle::SQLLoader->findProgram($sqlplus)));
 
 ok(generateSQL());
 

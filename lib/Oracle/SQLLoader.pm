@@ -1,5 +1,5 @@
 # -*- mode: cperl -*-
-# $Id: SQLLoader.pm,v 1.37 2004/09/11 04:59:20 ezra Exp $
+# $Id: SQLLoader.pm,v 1.39 2005/02/16 06:31:20 ezra Exp $
 
 =head1 NAME
 
@@ -153,7 +153,7 @@ use vars qw/@ISA
 
 
 
-$VERSION = '0.4';
+$VERSION = '0.5';
 @ISA = qw/Exporter/;
 @EXPORT_OK = qw/$CHAR $INT $DECIMAL $DATE $APPEND $TRUNCATE $REPLACE $INSERT/;
 
@@ -982,7 +982,12 @@ sub generateControlfile {
 =head3 B<findProgram()>
 
 searches ORACLE_HOME and PATH environment variables for an executable program.
-returns the full path and file name of the first match, or undef if not found
+returns the full path and file name of the first match, or undef if not found.
+can be invoked as a class or instance method.
+
+Oracle::SQLLoader->findProgram('sqlldr')
+or
+$ldr->findProgram('sqlldr.exe')
 
 =over 2
 
@@ -1000,7 +1005,10 @@ returns the full path and file name of the first match, or undef if not found
 
 ################################################################################
 sub findProgram {
+  my $argclass = shift;   
   my $exe = shift;
+  my $class = ref($argclass) || $argclass;
+
   if (exists $ENV{'ORACLE_HOME'}) {
     return "$ENV{'ORACLE_HOME'}/bin/$exe"
       if -x "$ENV{'ORACLE_HOME'}/bin/$exe";
@@ -1019,18 +1027,25 @@ sub findProgram {
 =head3 B<checkEnvironment()>
 
 ensure that ORACLE_HOME is set and that the sqlldr binary is present and
-executable
+executable. can be invoked as a class or instance method.
+
+Oracle::SQLLoader->findProgram('sqlldr')
+or
+$ldr->findProgram('sqlldr.exe')
 
 =cut
 
 ################################################################################
 sub checkEnvironment {
+  my $argclass = shift;
+  my $class = ref($argclass) || $argclass;
+
   carp __PACKAGE__."::checkEnvironment: no ORACLE_HOME environment variable set"
     unless $ENV{'ORACLE_HOME'};
   carp __PACKAGE__."::checkEnvironment: no ORACLE_SID environment variable set"
     unless $ENV{'ORACLE_SID'};
   carp __PACKAGE__."::checkEnvironment: sqlldr doesn't exist or isn't executable"
-    unless ($SQLLDRBIN = findProgram($SQLLDRBIN));
+    unless ($class->findProgram($SQLLDRBIN));
 } # sub checkEnvironment
 
 

@@ -29,3 +29,9 @@ Revision history for Perl extension Oracle::SQLLoader.
     available with the rest of the stats
   * added warn vs error cases to delimited and fixed length tests
   * findProgram now returns any matched full path to executables
+
+0.5  2005-02-15
+  * Nick B. reported a problem with the findProgram() method, which didn't
+    like being called in as an instance method. Changed utilities to be
+    class or instance calls.
+    https://rt.cpan.org/Ticket/Display.html?id=11461
