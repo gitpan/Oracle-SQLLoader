@@ -1,0 +1,80 @@
+Oracle-SQLLoader version 0.1
+=============================
+
+OVERVIEW
+
+Oracle::SQLLoader is an object interface to Oracle's SQL*Loader bulk loader
+utility. It is designed to minimize the amount of SQL*Loader synatx and
+number of options that you need to know about just to get data loaded into
+tables.
+
+It requires that you know a bit about your load scenario, such as the
+destination table name, destination columns, and the general layout of the file
+to be loaded. From there, the modules attempts to dwim as best as possible by
+using defaults to all of the various sqlldr options.
+
+The module currently supports the loading of a single table from a single file.
+The file can be either fixed width or delimited. For a delimited file load,
+just add the names of the destination columns in the order the fields appears
+in the data file and optionally supply a data type. For a fixed width load,
+supply the destination column name; the combination of the field starting
+offset and field length, or the field start and end offsets in the data file;
+and an optional data type.
+
+Besides letting you skip the Oracle docs, the module provides a lot of useful
+stats and return codes by parsing the sqlldr output.
+
+SUPPORTED PLATFORMS
+
+Oracle::SQLLoader has been successfully tested on the following platforms:
+
+* Oracle 9.2.1.0 on Solaris and Linux
+
+
+INSTALLATION
+
+To install this module type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+
+DEPENDENCIES
+
+You'll need to have the sqlldr executable somewhere in your path.
+
+You should have the following environment variables set:
+  ORACLE_HOME   - the location of the Oracle installation
+  ORACLE_SID    - the database instance name
+  ORACLE_USERID - the username and password to connect to the database as; the
+                  format is username/password (e.g. scott/tiger)
+
+COPYRIGHT AND LICENSE
+
+The Oracle::SQLLoader module is Copyright (c) 2004 Ezra Pagel.
+
+The Oracle::SQLLoader module is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself, either Perl version 5.8.4 or,
+at your option, any later version of Perl 5 you may have available.
+
+
+THOUGHTS
+
+I tried to keep this module as simple as possible. It does what I want it to
+do, but your definition of "most commonly used functionality" may differ from
+mine by quite a bit. I find myself repeating the same tasks regularly, and 90%
+of the time I'm just loading a single table from a fixed width file and don't
+feel like looking up the exact sqlldr syntax. The SQL*Loader utility, like most
+things Oracle, is exteremely well documented, so the I don't see the point in
+using a module to generate sqlldr control and parameter files if you've got to
+read just as much POD as you would Oracle docs.
+
+This module will never support every obscure option that sqlldr offers. It's
+highly unlikely that I'll ever find myself loading LOBs from an auxillary
+file, but in the event that I do, I'll add it to the module; patches and
+contributions welcome!
+
+
+$Id: README,v 1.5 2004/09/03 17:12:44 ezra Exp $

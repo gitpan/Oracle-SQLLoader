@@ -1,0 +1,27 @@
+* Handle SQL*Loader-specific error codes and report on them. For instance, I
+want to know if the instance is down (SQL*Loader-128), or if the table does
+not exist (SQL*Loader-941)
+
+* win32 support
+
+* par file support
+
+* instead of just munging 'infile', create an option for a log/scratch
+  directory that we can use for a default when we need to write to disk
+  (bads, logs, etc)
+
+* support more than one infile, and support diff bad, disc files for each
+
+* check for $ORACLE_HOME/bin/sqlldr and permissions in checkEnvironment
+
+* lob data
+
+* delimited load - add a constant designating a column to be skipped
+
+* delimited load - allow passing of columns w/out 'column_name' href
+
+* if we can get a DBI connection, we can just pull the column specs out of
+  USER_TAB_COLUMNS
+
+
+$Id: TODO,v 1.3 2004/09/03 16:29:55 ezra Exp $
