@@ -1,5 +1,5 @@
 # -*- mode: cperl -*-
-# $Id: SQLLoader.pm,v 1.32 2004/09/06 21:59:09 ezra Exp $
+# $Id: SQLLoader.pm,v 1.37 2004/09/11 04:59:20 ezra Exp $
 
 =head1 NAME
 
@@ -153,7 +153,7 @@ use vars qw/@ISA
 
 
 
-$VERSION = '0.3';
+$VERSION = '0.4';
 @ISA = qw/Exporter/;
 @EXPORT_OK = qw/$CHAR $INT $DECIMAL $DATE $APPEND $TRUNCATE $REPLACE $INSERT/;
 
@@ -217,8 +217,20 @@ $TRUNCATE = 'TRUNCATE';
 $REPLACE = 'REPLACE';
 $INSERT = 'INSERT';
 
+
 # what's the name of the sqlldr executable?
 my $SQLLDRBIN = $^O =~ /win32/i ? 'sqlldr.exe' : 'sqlldr';
+
+
+# trial+error result codes
+my %ERRORCODES = $^O =~ /win32/i ? (SUCCESS => 0,
+				    ERROR => 3,
+				    WARN => 2,
+				    FATAL => 4) :
+                                   (SUCCESS => 0,
+				    ERROR => 1,
+				    WARN => 2,
+				    FATAL => 3);
 
 # used to determine start/end epochs from logs
 my %MONTHS = (Jan => 0, Feb => 1, Mar => 2, Apr => 3, May => 4, Jun => 5,
@@ -535,7 +547,8 @@ sub addColumn {
 =head3 B<executeLoader()>
 
 generate a control file and execute an sqlldr job. this is a blocking call. if
-you don't care about load statistics, you can always fork it off.
+you don't care about load statistics, you can always fork it off. returns 1 if
+sqlldr ran successfully, 0 if there were errors or warnings
 
 =cut
 
@@ -549,21 +562,27 @@ sub executeLoader {
   my $cmd = "$exe control=$self->{'_control_file'} ".
             "userid=$self->{'_cfg_global'}{'userid'} ".
             "log=$self->{'_cfg_global'}{'logfile'} ".
-	    "$self->{'_cfg_global'}{'silent'} ";
-  my $retcode = system($cmd);
+	    "$self->{'_cfg_global'}{'silent'} 2>&1";
+  my $output = `$cmd`;
+  my $exitval = $? / 256;
+
+
   $self->checkLogfile();
 
-
+#--   if ($exitval == $ERRORCODES{'SUCCESS'} ||
+#--       $exitval == $ERRORCODES{'WARN'}) {
+#--     $self->checkLogfile();
+#--
   if ($self->{'_cleanup'}) {
     my $ctlFile = $self->{'_cfg_global'}{'control_file'} ||
       $self->{'_cfg_global'}{'infile'} . ".ctl";
     unlink $ctlFile;
-
     unlink $self->{'_cfg_global'}{'badfile'};
     unlink $self->{'_cfg_global'}{'discardfile'};
     unlink $self->{'_cfg_global'}{'logfile'};
   }
-  return ! $retcode;
+
+  return ! $exitval;
 } # sub executeLoader
 
 
@@ -610,6 +629,7 @@ sub checkLogfile {
   # skip the first line, check the second for the SQL*Loader declaration
   my $line = <$log>;
   $line = <$log>;
+
   unless ($line =~ /^SQL\*Loader/) {
     carp __PACKAGE__."::checkLoadLogfile: $logfile does not appear to be a ".
       "valid sqlldr log file. returning";
@@ -617,8 +637,14 @@ sub checkLogfile {
   }
 
   while (<$log>) {
+    chomp;
     if (/Total logical records skipped:\s+(\d+)/) {
       $self->{'_stats'}{'skipped'} = $1;
+    }
+
+    # presume that additional lines have error messages
+    elsif (/^SQL\*Loader/) {
+      push (@{$self->{'_stats'}->{'errors'}},$_);
     }
     elsif (/Total logical records read:\s+(\d+)/) {
       $self->{'_stats'}{'read'} = $1;
@@ -835,6 +861,49 @@ sub getCpuSeconds {
 }
 
 
+###############################################################################
+
+=head3 B<getErrors()>
+
+returns a listref of any SQL*Loader-specific error codes and messages that were
+reported in the load logs, e.g the instance is down (SQL*Loader-128),
+the table does not exist (SQL*Loader-941), or the username/password was wrong
+(SQL*Loader-101). see the 'SQL*Loader Messages' section of your Oracle docs
+
+=cut
+
+###############################################################################
+sub getErrors {
+  my $self = shift;
+  return $self->{'_stats'}{'errors'};
+} # getErrors
+
+
+
+###############################################################################
+
+=head3 B<getLastError()>
+
+returns the last known SQL*Loader error code and message, or an empty string
+
+=cut
+
+###############################################################################
+sub getLastError {
+  my $self = shift;
+  if (scalar @{$self->{'_stats'}{'errors'}}) {
+    return $self->{'_stats'}{'errors'}->[$#{$self->{'_stats'}{'errors'}}];
+  }
+  return '';
+} # getErrors
+
+
+
+
+
+
+
+
 
 ###############################################################################
 
@@ -912,7 +981,8 @@ sub generateControlfile {
 
 =head3 B<findProgram()>
 
-searches ORACLE_HOME and PATH environment variables for an executable program
+searches ORACLE_HOME and PATH environment variables for an executable program.
+returns the full path and file name of the first match, or undef if not found
 
 =over 2
 
@@ -929,14 +999,15 @@ searches ORACLE_HOME and PATH environment variables for an executable program
 =cut
 
 ################################################################################
-sub findProgram{
+sub findProgram {
   my $exe = shift;
   if (exists $ENV{'ORACLE_HOME'}) {
-    return 1 if -x "$ENV{'ORACLE_HOME'}/bin/$exe";
+    return "$ENV{'ORACLE_HOME'}/bin/$exe"
+      if -x "$ENV{'ORACLE_HOME'}/bin/$exe";
   }
 
   foreach (split($Config{'path_sep'}, $ENV{'PATH'})){
-    return 1 if -x "$_/$exe";
+    return "$_/$exe" if -x "$_/$exe";
   }
   return undef;
 } # sub findProgram
@@ -959,7 +1030,7 @@ sub checkEnvironment {
   carp __PACKAGE__."::checkEnvironment: no ORACLE_SID environment variable set"
     unless $ENV{'ORACLE_SID'};
   carp __PACKAGE__."::checkEnvironment: sqlldr doesn't exist or isn't executable"
-    unless findProgram($SQLLDRBIN)
+    unless ($SQLLDRBIN = findProgram($SQLLDRBIN));
 } # sub checkEnvironment
 
 
@@ -1031,16 +1102,28 @@ sub _initDefaults {
   # default to shutup
   $self->{'_cfg_global'}{'silent'} = $args{'silent'} ? $args{'silent'} :
                                     'silent=header,feedback';
-  #  'silent=header,feedback,errors,discards,partitions';
+#    'silent=header,feedback,errors,discards,partitions';
 
 
   # figure out if we've got username and password arguments. if not, check
   # ORACLE_USERID for it and see if it's a 'scott/tiger@sid' format
   if ($args{'username'}) {
     if (exists $args{'password'}) {
+
+      my $sid;
+      if (exists $args{'sid'}) {
+	$sid = $args{'sid'};
+      }
+      elsif(exists $ENV{'ORACLE_SID'}) {
+	$sid = $ENV{'ORACLE_SID'};
+      }
+      else {
+	croak __PACKAGE__,"::_initDefaults(): must include sid argument if no ".
+	  "ORACLE_SID environment variable is set";
+      }
       $self->{'_cfg_global'}{'userid'} =
 	$args{'username'} . "/" .
-	$args{'password'};
+	$args{'password'} . "\@$sid";
     }
     else {
       croak __PACKAGE__,"::_initDefaults(): must include password with ".
@@ -1075,6 +1158,15 @@ sub _initDefaults {
   # testing or auditing?
   $self->{'_cleanup'} = exists $args{'cleanup'} ? $args{'cleanup'} : 1;
 
+
+
+  # finally, initialize any stats we're interested in
+  $self->{'_stats'}{'skipped'} = undef;
+  $self->{'_stats'}{'read'} = undef;
+  $self->{'_stats'}{'rejected'} = undef;
+  $self->{'_stats'}{'discarded'} = undef;
+  $self->{'_stats'}{'loaded'} = undef;
+  $self->{'_stats'}{'errors'} = [];
 
 } # sub _initDefaults
 

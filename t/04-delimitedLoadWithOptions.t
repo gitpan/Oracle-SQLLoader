@@ -1,6 +1,6 @@
 #!/bin/env perl -w
 # -*- mode: cperl -*-
-# $Id: 04-delimitedLoadWithOptions.t,v 1.1 2004/09/05 06:59:40 ezra Exp $
+# $Id: 04-delimitedLoadWithOptions.t,v 1.3 2004/09/11 04:42:20 ezra Exp $
 
 BEGIN {
   unless(grep /blib/, @INC) {
@@ -15,7 +15,7 @@ use Test;
 use Cwd;
 
 BEGIN {
- plan tests => 4
+ plan tests => 5
 }
 
 
@@ -27,9 +27,11 @@ ok(generateInputFile());
 
 ok(goodLoad());
 
-ok(generateNoDelimiterLoadFile());
+ok(generateBadFile());
 
-ok(noDelimiterLoad());
+ok(warnLoad());
+
+ok(errorLoad());
 
 cleanup();
 
@@ -90,7 +92,7 @@ sub goodLoad {
 
 
 ##############################################################################
-sub generateNoDelimiterLoadFile {
+sub generateBadFile {
   open (IN, ">$delimitedFile") || return 0;
 
 #  char_col     char(10),
@@ -105,12 +107,12 @@ ccccccccccc     ccccc       2931029391039131.333
 ddddddddddd    dddddd19329329321029391039131.333";
   close IN;
   return 1;
-} # sub generateNoDelimiterLoadFile
+} # sub generateBadFile
 
 
 
 ##############################################################################
-sub noDelimiterLoad {
+sub warnLoad {
   my ($user, $pass) = split('/',$ENV{'ORACLE_USERID'});
   my $ldr = new Oracle::SQLLoader(
 				  infile => $delimitedFile,
@@ -139,7 +141,50 @@ sub noDelimiterLoad {
     'Column not found before end of logical record (use TRAILING NULLCOLS)';
 
   return 1;
-} # sub noDelimiterLoad
+} # sub warnLoad
+
+
+
+
+##############################################################################
+sub errorLoad {
+  my ($user, $pass) = split('/',$ENV{'ORACLE_USERID'});
+  my $ldr = new Oracle::SQLLoader(
+				  infile => $delimitedFile,
+				  terminated_by => ',',
+				  username => $user,
+				  password => $pass,
+				 );
+
+
+  $ldr->addTable(table_name => $testTableName);
+  $ldr->addColumn(column_name => 'char_col');
+  $ldr->addColumn(column_name => 'varchar_col');
+  $ldr->addColumn(column_name => 'int_col');
+  $ldr->addColumn(column_name => 'float_col');
+
+  unlink $delimitedFile;
+
+  # this is supposed to break
+  return 0 unless not $ldr->executeLoader();
+
+  # stats
+  return 0 unless $ldr->getNumberSkipped() == 0;
+  return 0 unless $ldr->getNumberRead() == 0;
+  return 0 unless $ldr->getNumberRejected() == 0;
+  return 0 unless $ldr->getNumberDiscarded() == 0;
+  return 0 unless $ldr->getNumberLoaded() == 0;
+
+  # shouldn't be any rejects, just some real error messages
+  return 0 if defined $ldr->getLastRejectMessage();
+
+  # catch messages with errors specific to these malformed lines
+  my $errors = $ldr->getErrors();
+  return 0 unless $#$errors == 3;
+  return 0 unless $ldr->getLastError() =~ /SQL\*Loader-2026/;
+
+  return 1;
+} # sub errorLoad
 
 
 

@@ -1,6 +1,6 @@
 #!/bin/env perl -w
 # -*- mode: cperl -*-
-# $Id: 01-createTable.t,v 1.6 2004/09/06 21:44:55 ezra Exp $
+# $Id: 01-createTable.t,v 1.7 2004/09/11 04:39:24 ezra Exp $
 
 BEGIN {
   unless(grep /blib/, @INC) {
@@ -23,7 +23,7 @@ my $testTableName = "SQLLOADER_TEST_TABLE";
 my $ddlFile = getcwd() . "/$testTableName.sql";
 my $sqlplus = $^O =~/win32/i ? 'sqlplus.exe' : 'sqlplus';
 
-ok(Oracle::SQLLoader::findProgram($sqlplus));
+ok(($sqlplus = Oracle::SQLLoader::findProgram($sqlplus)));
 
 ok(generateSQL());
 
@@ -53,7 +53,7 @@ create table $testTableName (
 sub createTable {
   return 0 unless exists $ENV{'ORACLE_USERID'};
   my $userId = $ENV{'ORACLE_USERID'};
-  my $exe = "sqlplus $userId \@$testTableName.sql";
+  my $exe = "$sqlplus $userId \@$testTableName.sql";
   print "Creating table with command \"$exe\"\n";
   my $resLog = `$exe`;
   return 1 if $resLog =~ /Table dropped\./ &&
