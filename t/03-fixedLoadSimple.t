@@ -1,6 +1,6 @@
 #!/bin/env perl -w
 # -*- mode: cperl -*-
-# $Id: 03-fixedLoadSimple.t,v 1.1 2004/09/03 15:00:48 ezra Exp $
+# $Id: 03-fixedLoadSimple.t,v 1.4 2004/09/05 05:59:45 ezra Exp $
 
 BEGIN {
   unless(grep /blib/, @INC) {
@@ -9,7 +9,7 @@ BEGIN {
   }
 }
 
-use Oracle::SQLLoader qw/$CHAR $INT $FLOAT $DATE/;
+use Oracle::SQLLoader qw/$CHAR $INT $DECIMAL $DATE/;
 use strict;
 use Test;
 use Cwd;
@@ -20,7 +20,7 @@ BEGIN {
 
 
 my $testTableName = "SQLLOADER_TEST_TABLE";
-my $fixedWidthFile = getcwd() . "/$testTableName.fw";
+my $fixedLengthFile = getcwd() . "/$testTableName.fw";
 
 ok(generateInputFile());
 ok(goodLoad());
@@ -34,7 +34,7 @@ cleanup();
 
 ##############################################################################
 sub generateInputFile {
-  open (IN, ">$fixedWidthFile") || return 0;
+  open (IN, ">$fixedLengthFile") || return 0;
 
 #  char_col     char(10),
 #  varchar_col  varchar2(10),
@@ -57,8 +57,8 @@ sub goodLoad {
   my ($user, $pass) = split('/',$ENV{'ORACLE_USERID'});
 
   my $ldr = new Oracle::SQLLoader(
-				  infile => $fixedWidthFile,
-				  userid => $user,
+				  infile => $fixedLengthFile,
+				  username => $user,
 				  password => $pass,
 				 );
 
@@ -88,22 +88,28 @@ sub goodLoad {
   $ldr->addColumn(column_name => 'float_col',
 		  field_offset => 30,
 		  field_end => 39,
-		  column_type => $FLOAT);
+		  column_type => $DECIMAL);
 
   $ldr->addColumn(column_name => 'date_col',
 		  field_offset => 40,
 		  field_length => 13,
 		  date_format => "YYYYMMDD HH24:MI",
 		  column_type => $DATE);
-  $ldr->executeSqlldr() || warn "Problem executing sqlldr: $@\n";
+  $ldr->executeLoader() || warn "Problem executing sqlldr: $@\n";
 
-  return 0 unless $ldr->executeSqlldr();
+  return 0 unless $ldr->executeLoader();
   return 0 unless $ldr->getNumberSkipped() == 0;
   return 0 unless $ldr->getNumberRead() == 4;
   return 0 unless $ldr->getNumberRejected() == 0;
   return 0 unless $ldr->getNumberDiscarded() == 0;
   return 0 unless $ldr->getNumberLoaded() == 4;
   return 0 unless not defined $ldr->getLastRejectMessage();
+
+  # no telling what these are. let's check for defined...
+  return 0 unless defined $ldr->getLoadBegin();
+  return 0 unless defined $ldr->getLoadEnd();
+  return 0 unless defined $ldr->getElapsedSeconds();
+  return 0 unless defined $ldr->getCpuSeconds();
 
   # yay.
   return 1;
@@ -113,7 +119,7 @@ sub goodLoad {
 
 ##############################################################################
 sub generateWrongOffsetLoadFile {
-  open (IN, ">$fixedWidthFile") || return 0;
+  open (IN, ">$fixedLengthFile") || return 0;
 
 #  char_col     char(10),
 #  varchar_col  varchar2(10),
@@ -134,9 +140,9 @@ X";
 sub wrongOffsetLoad {
   my ($user, $pass) = split('/',$ENV{'ORACLE_USERID'});
   my $ldr = new Oracle::SQLLoader(
-				  infile => $fixedWidthFile,
+				  infile => $fixedLengthFile,
 				  terminated_by => ',',
-				  userid => $user,
+				  username => $user,
 				  password => $pass,
 				 );
 
@@ -148,7 +154,7 @@ sub wrongOffsetLoad {
   $ldr->addColumn(column_name => 'float_col');
 
   # this is supposed to break
-  return 0 unless not $ldr->executeSqlldr();
+  return 0 unless not $ldr->executeLoader();
 
   # stats
   return 0 unless $ldr->getNumberSkipped() == 0;
@@ -167,5 +173,5 @@ sub wrongOffsetLoad {
 
 ##############################################################################
 sub cleanup {
-  unlink $fixedWidthFile;
+  unlink $fixedLengthFile;
 }

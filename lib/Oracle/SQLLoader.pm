@@ -1,5 +1,5 @@
 # -*- mode: cperl -*-
-# $Id: SQLLoader.pm,v 1.12 2004/09/03 16:59:56 ezra Exp $
+# $Id: SQLLoader.pm,v 1.24 2004/09/05 06:47:43 ezra Exp $
 
 =head1 NAME
 
@@ -12,9 +12,9 @@ functionality of Oracle's SQL*Loader bulk loader utility. It tries to dwim
 as best as possible by using defaults to all of the various sqlldr options.
 
 The module currently supports the loading of a single table from a single file.
-The file can be either fixed width or delimited. For a delimited file load, just
+The file can be either fixed length or delimited. For a delimited file load, just
 add the names of the destination columns in the order the fields appears in the
-data file and optionally supply a data type. For a fixed width load, supply the
+data file and optionally supply a data type. For a fixed length load, supply the
 destination column name; the combination of the field starting offset and field
 length, or the field start and end offsets in the data file; and an optional
 data type.
@@ -25,13 +25,13 @@ stats and return codes by parsing the sqlldr output.
 
 =head1 SYNOPSIS
 
-  use Oracle::SQLLoader qw/$CHAR $INT $FLOAT $DATE/;
+  use Oracle::SQLLoader qw/$CHAR $INT $DECIMAL $DATE/;
 
   ### load a simple comma-delimited file to a single table
   $ldr = new Oracle::SQLLoader(
  				infile => '/tmp/test.dat',
  				terminated_by => ',',
- 				userid => $user,
+ 				username => $user,
  				password => $pass,
  			       );
 
@@ -39,7 +39,7 @@ stats and return codes by parsing the sqlldr output.
   $ldr->addColumn(column_name => 'first_col');
   $ldr->addColumn(column_name => 'second_col');
   $ldr->addColumn(column_name => 'third_col');
-  $ldr->executeSqlldr() || warn "Problem executing sqlldr: $@\n";
+  $ldr->executeLoader() || warn "Problem executing sqlldr: $@\n";
 
   # stats
   $skipped = $ldr->getNumberSkipped();
@@ -50,47 +50,47 @@ stats and return codes by parsing the sqlldr output.
 
 
 
-  #### a fixed width example
-  $fwldr = new Oracle::SQLLoader(
+  #### a fixed length example
+  $flldr = new Oracle::SQLLoader(
 				 infile => '/tmp/test.fixed',
-				 userid => $user,
+				 username => $user,
 				 password => $pass,
 				 );
-  $fwldr->addTable(table_name => 'test_table');
+  $flldr->addTable(table_name => 'test_table');
 
-  $fwldr->addColumn(column_name => 'first_col',
+  $flldr->addColumn(column_name => 'first_col',
 	            field_offset => 0,
 		    field_length => 4,
 		    column_type => $INT);
 
-  $fwldr->addColumn(column_name => 'second_col',
+  $flldr->addColumn(column_name => 'second_col',
 	            field_offset => 4,
 		    field_end => 9);
 
-  $fwldr->addColumn(column_name => 'third_col',
+  $flldr->addColumn(column_name => 'third_col',
 	            field_offset => 9,
 		    field_end => 14,
 		    column_type => $CHAR);
 
-  $fwldr->addColumn(column_name => 'timestamp',
+  $flldr->addColumn(column_name => 'timestamp',
 	            field_offset => 9,
 		    field_length => 13,
                     column_type => $DATE,
 		    date_format => "YYYYMMDD HH24:MI");
 
-  $fwldr->executeSqlldr() || warn "Problem executing sqlldr: $@\n";
+  $flldr->executeLoader() || warn "Problem executing sqlldr: $@\n";
 
   # stats
-  $skipped = $fwldr->getNumberSkipped();
-  $read = $fwldr->getNumberRead();
-  $rejects = $fwldr->getNumberRejected();
-  $discards = $fwldr->getNumberDiscarded();
-  $loads = $fwldr->getNumberLoaded();
+  $skipped = $flldr->getNumberSkipped();
+  $read = $flldr->getNumberRead();
+  $rejects = $flldr->getNumberRejected();
+  $discards = $flldr->getNumberDiscarded();
+  $loads = $flldr->getNumberLoaded();
 
 
 =head1 AUTHOR
 
-Ezra Pagel <ezra@austinlogistics.com>
+Ezra Pagel <ezra@cpan.org>
 
 =head1 COPYRIGHT
 
@@ -100,6 +100,7 @@ The Oracle::SQLLoader module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself, either Perl version 5.8.4 or,
 at your option, any later version of Perl 5 you may have available.
 
+SQL*Loader is Copyright (c) 1982, 2002, Oracle Corporation.  All rights reserved.
 
 =cut
 
@@ -111,27 +112,72 @@ use Config;
 use Cwd;
 use strict;
 use Exporter;
+use Time::Local;
 
 use vars qw/@ISA
             @EXPORT_OK
             $VERSION
             $CHAR
             $INT
-            $FLOAT
+            $DECIMAL
             $DATE
             $APPEND
             $TRUNCATE
             $REPLACE
             $INSERT/;
 
-$VERSION = '0.1';
-@ISA = qw/Exporter/;
-@EXPORT_OK = qw/$CHAR $INT $FLOAT $DATE $APPEND $TRUNCATE $REPLACE $INSERT/;
 
-# these might be too common to export. any mangling necessary?
+
+$VERSION = '0.2';
+@ISA = qw/Exporter/;
+@EXPORT_OK = qw/$CHAR $INT $DECIMAL $DATE $APPEND $TRUNCATE $REPLACE $INSERT/;
+
+
+
+################################################################################
+
+=head1 Importable Variables
+
+=over 2
+
+=item Column Data Types
+
+=over 2
+
+=item $CHAR - data to be interpreted as character. empty data is treated as null
+
+=item $INT - data to be interpreted as integer. empty data is treated as 0
+
+=item $DECIMAL - data to be interpreted as floating point. empty data is treated
+as null
+
+=item $DATE - date fields. these want a valid format, but will default to DD-MON-YY
+
+=back
+
+=item Table Load Modes
+
+=over 2
+
+=item $APPEND - add new rows into the table
+
+=item $INSERT - adds rows into an empty table, or error out if the table has data
+
+=item $REPLACE - delete all existing rows from the table and then load
+
+=item $TRUNCATE - truncate the table (no rollback!) and then load
+
+=back
+
+=back
+
+=cut
+
+################################################################################
+
 $CHAR = 'CHAR';
 $INT = 'INTEGER EXTERNAL';
-$FLOAT = 'FLOAT EXTERNAL';
+$DECIMAL = 'DECIMAL EXTERNAL';
 $DATE = 'DATE';
 $APPEND = 'APPEND';
 $TRUNCATE = 'TRUNCATE';
@@ -141,13 +187,21 @@ $INSERT = 'INSERT';
 # what's the name of the sqlldr executable?
 my $SQLLDRBIN = 'sqlldr';
 
+# used to determine start/end epochs from logs
+my %MONTHS = (Jan => 0, Feb => 1, Mar => 2, Apr => 3, May => 4, Jun => 5,
+	      Jul => 6, Aug => 7, Sep => 8, Oct => 9, Nov => 10, Dec=> 11);
 my $DEBUG = 0;
 
 
+################################################################################
 
-=head1 METHODS
+=head1 Public Methods
 
 =cut
+
+################################################################################
+
+
 
 
 ################################################################################
@@ -164,13 +218,69 @@ create a new Oracle::SQLLoader object
 
 =item I<infile> - the name and full filesystem path to the input file
 
+=item I<username> - the oracle username for this load
+
+=item I<password> - the password for this username
+
 =back
 
-=item optional arguments
+=item common arguments
 
 =over 2
 
-=item I<userid> - the username and password for this load
+=item I<terminated_by> - if you're planning on loading a delimited file,
+just provide the character used as a delimiter and Oracle::SQLLoader will
+presume that it's a delimited load from here on out. if this option is not
+supplied, a fixed length file format will be used.
+
+=item I<direct> - bypass parsing sql and write directly to the tablespace on
+the filesystem. this is considerably faster than conventional loads, but can
+only be performed on a local instance. if this argument is not supplied,
+conventional load will be used.
+
+=item I<loadmode> - one of the above Load Modes: $APPEND, $INSERT, $REPLACE,
+$TRUNCATE (default $APPEND)
+
+=back
+
+=item other optional arguments - you can safely accept the defaults and
+pretend that these don't exist.
+
+=over 2
+
+=item I<bindsize> - byte size of conventional load buffer; also sets
+I<readsize> (default 256000)
+
+=item I<columnarrayrows> - number of rows to buffer for direct loads
+(default 5000)
+
+=item I<errors> - the maximum number of errors to accept before failing
+the load (default 50)
+
+=item I<load> - the maximum number of records to load
+
+=item I<rows> - the number of rows to load before committing
+
+=item I<skip> - the number of records to skip
+
+=item I<skip_index_maintenance> - for direct loads, don't rebuild indexes
+
+=item I<skip_unusable_indexes> - skips rebuilding unusable indexes
+
+=item I<streamsize> - (direct) the byte size of the load stream
+
+=item I<badfile> - 
+
+=item I<discardfile> -
+
+=item I<eol> - 
+
+=item I<offset_from> - do your offsets start at position 0 or 1
+
+=item I<enclosed_by> - are there some sort of enclosing characters, double-quotes perhaps?
+
+=item I<nocleanup> - want to leave the load files on disk, maybe for
+testing/auditing?
 
 =back
 
@@ -181,6 +291,14 @@ create a new Oracle::SQLLoader object
 ################################################################################
 sub new {
   my ($class, %args) = @_;
+
+  my %opts = (
+	      bindsize => 256000,
+	     );
+
+
+
+
 
   croak __PACKAGE__."::new: missing mandatory argument 'infile'"
     unless exists $args{'infile'};
@@ -196,92 +314,6 @@ sub new {
 
   return $self;
 } # sub new
-
-
-
-
-################################################################################
-# setup sane defaults
-################################################################################
-sub _initDefaults {
-  my $self = shift;
-  my %args = @_;
-
-
-  # _cfg_global
-  if ($args{'infile'} eq '*') {
-    # so we're loading inline data; that means that we don't have a sane
-    # default for any of the other file options.
-    $args{'badfile'} ? $self->{'_cfg_global'} = $args{'badfile'} :
-      croak __PACKAGE__,"::_initDefaults: can't guess badfile with inline data";
-
-    $args{'discardfile'} ? $self->{'_cfg_global'} = $args{'discardfile'} :
-      croak __PACKAGE__,"::_initDefaults: can't guess discardfile with inline data";
-
-    $args{'logfile'} ? $self->{'_cfg_global'} = $args{'logfile'} :
-      croak __PACKAGE__,"::_initDefaults: can't guess logfile with inline data";
-
-  }
-  else {
-    $self->{'_cfg_global'}{'badfile'} = $args{'badfile'} ||
-      $args{'infile'} . '.bad';
-    $self->{'_cfg_global'}{'discardfile'} = $args{'discardfile'} ||
-      $args{'infile'} . '.discard';
-    $self->{'_cfg_global'}{'logfile'} = $args{'logfile'} ||
-      $args{'infile'} . '.log';
-  }
-
-  $self->{'_cfg_global'}{'infile'} = $args{'infile'};
-
-  # fix $recordLength, var $bytes
-  $self->{'_cfg_global'}{'recfmt'} = $args{'recfmt'} || '';
-
-  # end of stream terminator. don't bother with defaulting to \n
-  $self->{'_cfg_global'}{'eol'} = $args{'eol'} || '';
-
-  # delimiter?
-  $self->{'_cfg_global'}{'terminated_by'} = $args{'terminated_by'};
-
-  # if not, it's fixed width; do offsets start at position 0 or 1?
-  $self->{_cfg_global}{'offset_from'} = $args{'offset_from'} || 0;
-
-  # are there some sort of enclosing characters, double-quotes perhaps?
-  $self->{'_cfg_global'}{'enclosed_by'} = $args{'enclosed_by'};
-
-  # default to 'all'
-  $self->{'_cfg_global'}{'discardmax'} = $args{'discardmax'} || '';
-
-  # default to shutup
-  $self->{'_cfg_global'}{'silent'} = $args{'silent'} ? $args{'silent'} :
-                                    'silent=header,feedback';
-  #  'silent=header,feedback,errors,discards,partitions';
-
-  # figure out if we've got a userid/pass, or if we're using a parfile
-  if ($args{'userid'}) {
-    $self->{'_cfg_global'}{'userid'} = $args{'userid'};
-
-    croak __PACKAGE__,"::_initDefaults: must include password with userid option"
-      unless $args{'password'};
-
-    $self->{'_cfg_global'}{'password'} = $args{'password'};
-  }
-  else {
-    warn "TODO: no userid, must have paramfile\n";
-  }
-
-  # default the load mode to append
-  $self->{'_cfg_global'}{'loadmode'} = $args{'loadmode'} || $APPEND;
-
-  # cache the last table
-  undef $self->{'_last_table'};
-
-  # do we want to cleanup after ourselves, or leave the files around for
-  # testing or auditing?
-  $self->{'_cleanup'} = exists $args{'cleanup'} ? $args{'cleanup'} : 1;
-
-
-} # sub _initDefaults
-
 
 
 
@@ -327,12 +359,16 @@ any old definition.
 ###############################################################################
 sub addTable {
   my $self = shift;
+
+  croak __PACKAGE__."::addTable(): need name/value pairs" unless $#_ % 2;
+
   my %args = @_;
   croak __PACKAGE__."::addTable: missing table name"
     unless $args{'table_name'};
   $self->{'_cfg_tables'}{$args{'table_name'}} = \%args;
   $self->{'_last_table'} = $args{'table_name'};
 } # sub addTable
+
 
 
 
@@ -353,7 +389,7 @@ add a column to be loaded
 
 =back
 
-=item mandatory arguments for fixed width load types
+=item mandatory arguments for fixed length load types
 
 =over 2
 
@@ -381,10 +417,14 @@ specified, default is the last known table name. if no previous table name
 exists, croak.
 
 =item I<column_type> -
-$CHAR, $INT, $FLOAT, or $DATE; defaults to $CHAR
+$CHAR, $INT, $DECIMAL, or $DATE; defaults to $CHAR
 
 =item I<date_format> -
 the TO_DATE format for a $DATE column; defaults to "DD-MON-YY"
+
+=item I<column_length> -
+on occassion, it's useful to specify the length of the field; for some reason,
+this is required when loading large strings (e.g. CHAR(3000))
 
 =back
 
@@ -405,7 +445,7 @@ sub addColumn {
   # if this isn't a delimited file, then we'll need offsets and lengths for
   # each column to parse
   if (not $self->{'_cfg_global'}{'terminated_by'}) {
-    croak __PACKAGE__."::addColumn: fixed width file fields require offset ".
+    croak __PACKAGE__."::addColumn: fixed length file fields require offset ".
       "and length or end" unless (exists $args{'field_offset'} &&
 				  (exists $args{'field_length'} ||
 				   exists $args{'field_end'})
@@ -432,11 +472,15 @@ sub addColumn {
     delete $args{'field_end'};
   }
 
+
   # control files default to character;
   # so the external numeric types mean that there are strings, but that
   # they should be treated as numbers, including defaulting to 0, not null
   $args{'column_type'} = $args{'column_type'} || $CHAR;
 
+  $args{'column_length'} = $args{'column_length'} ?
+    "($args{'column_length'})" : '';
+  $args{'column_type'} .= $args{'column_length'};
 
   # and should we just warn and use the default format? probably not; i'd hade
   # to load a bunch of bad date w/out knowing about it.
@@ -455,20 +499,30 @@ sub addColumn {
 
 ################################################################################
 
-=head2 B<executeSqlldr()>
+=head2 B<executeLoader()>
 
-kick off an sqlldr job
+generate a control file and execute an sqlldr job. this is a blocking call. if
+you don't care about load statistics, you can always fork it off.
 
 =cut
 
 ################################################################################
-sub executeSqlldr {
+sub executeLoader {
   my $self = shift;
-  # TODO: are we using a parfile?
-  my $retcode = $self->_executeSqlldr();
+
+  $self->generateControlfile();
+#  if ($self->{'_OSTYPE'} ne 'WIN') {
+  my $exe = $ENV{'ORACLE_HOME'}."/bin/$SQLLDRBIN";
+  my $cmd = "$exe control=$self->{'_control_file'} ".
+            "userid=$self->{'_cfg_global'}{'userid'} ".
+            "log=$self->{'_cfg_global'}{'logfile'} ".
+	    "$self->{'_cfg_global'}{'silent'} ";
+  my $retcode = system($cmd);
+  $self->checkLogfile();
+
 
   if ($self->{'_cleanup'}) {
-    my $ctlFile = $self->{'cfg_global'}{'control_file'} ||
+    my $ctlFile = $self->{'_cfg_global'}{'control_file'} ||
       $self->{'_cfg_global'}{'infile'} . ".ctl";
     unlink $ctlFile;
 
@@ -477,31 +531,9 @@ sub executeSqlldr {
     unlink $self->{'_cfg_global'}{'logfile'};
   }
   return ! $retcode;
-} # sub executeSqlldr
+} # sub executeLoader
 
 
-
-
-################################################################################
-# kick off an sqlldr job using command line parameters
-################################################################################
-sub _executeSqlldr {
-  my $self = shift;
-  my $retcode;
-
-  $self->generateControlfile();
-#  if ($self->{'_OSTYPE'} ne 'WIN') {
-  my $exe = $ENV{'ORACLE_HOME'}."/bin/$SQLLDRBIN";
-  my $cmd = "$exe control=$self->{'_control_file'} ".
-            "userid=$self->{'_cfg_global'}{'userid'}/".
-            "$self->{'_cfg_global'}{'password'} ".
-            "log=$self->{'_cfg_global'}{'logfile'} ".
-	    "$self->{'_cfg_global'}{'silent'} ";
-  $retcode = system($cmd);
-  $self->checkLogfile();
-  # TODO:
-  return $retcode;
-} # sub _executeSqlldrNoParfile
 
 
 
@@ -574,6 +606,25 @@ sub checkLogfile {
       $errMsg =~ s/\s+$//g;
       $self->{'_stats'}{'last_reject_message'} = $errMsg;
     }
+    elsif(/Run began on (\w+)\s(\w+)\s(\d\d)\s(\d\d):(\d\d):(\d\d)\s+(\d{4})/) {
+      my ($dow,$mon,$dom,$hr,$min,$sec,$yr) = ($1,$2,$3,$4,$5,$6,$7);
+      $yr -= 1900;
+      $mon = $MONTHS{$mon};
+      $self->{'_stats'}{'run_begin'} = timelocal($sec,$min,$hr,$dom,$mon,$yr);
+    }
+    elsif(/Run ended on (\w+)\s(\w+)\s(\d\d)\s(\d\d):(\d\d):(\d\d)\s+(\d{4})/) {
+      my ($dow,$mon,$dom,$hr,$min,$sec,$yr) = ($1,$2,$3,$4,$5,$6,$7);
+      $yr -= 1900;
+      $mon = $MONTHS{$mon};
+      $self->{'_stats'}{'run_end'} = timelocal($sec,$min,$hr,$dom,$mon,$yr);
+    }
+    elsif(/Elapsed time was:\s+(\d+):(\d{2}):(\d{2})\.\d{2}/) {
+      # i'm assuming that this is hh::mm::ss.ms
+      $self->{'_stats'}{'elapsed_seconds'} = (3600 * $1) + (60 * $2) + $3;
+    }
+    elsif(/CPU time was:\s+(\d+):(\d{2}):(\d{2})\.\d{2}/) {
+      $self->{'_stats'}{'cpu_seconds'} = (3600 * $1) + (60 * $2) + $3;
+    }
   }
 
   $self->{'_stats'}{'skipped'} ||= 0;
@@ -581,15 +632,26 @@ sub checkLogfile {
   $self->{'_stats'}{'rejected'} ||= 0;
   $self->{'_stats'}{'discarded'} ||= 0;
   $self->{'_stats'}{'loaded'} ||= 0;
+  $self->{'_stats'}{'run_begin'} ||= 0;
+  $self->{'_stats'}{'run_end'} ||= time;
+  $self->{'_stats'}{'elapsed_seconds'} ||= 0;
+  $self->{'_stats'}{'cpu_seconds'} ||= 0;
 
   $log->close;
 } # sub checkLoadLogfile
 
 
 
-=head1 STATUS METHODS
+###############################################################################
+
+=head1 Status Methods
 
 =cut
+
+###############################################################################
+
+
+
 
 ###############################################################################
 
@@ -666,6 +728,7 @@ sub getNumberLoaded {
 }
 
 
+
 ###############################################################################
 
 =head2 B<getLastRejectMessage()>
@@ -680,15 +743,71 @@ sub getLastRejectMessage {
 }
 
 
+###############################################################################
 
+=head2 B<getLoadBegin()>
 
-#*******************************************************************************
-
-=head1 B<Content Generation Functions>
+the time that the job began represented as epoch timestamp
 
 =cut
 
-#*******************************************************************************
+###############################################################################
+sub getLoadBegin {
+  $_[0]->{'_stats'}{'run_begin'};
+}
+
+###############################################################################
+
+=head2 B<getLoadEnd()>
+
+the time that the job finished represented as epoch timestamp
+
+=cut
+
+###############################################################################
+sub getLoadEnd {
+  $_[0]->{'_stats'}{'run_end'};
+}
+
+
+###############################################################################
+
+=head2 B<getElapsedSeconds()>
+
+returns the number if seconds elapsed during load
+
+=cut
+
+###############################################################################
+sub getElapsedSeconds {
+  $_[0]->{'_stats'}{'elapsed_seconds'};
+}
+
+
+
+###############################################################################
+
+=head2 B<getCpuSeconds()>
+
+returns the number if seconds on cpu during load
+
+=cut
+
+###############################################################################
+sub getCpuSeconds {
+  $_[0]->{'_stats'}{'cpu_seconds'};
+}
+
+
+
+###############################################################################
+
+=head1 B<Content Generation Methods>
+
+=cut
+
+###############################################################################
+
 
 
 
@@ -705,7 +824,7 @@ generated text is retrievable by calling getParfileText
 sub generateControlfile {
   my $self = shift;
 
-  my $ctlFile = $self->{'cfg_global'}{'control_file'} ||
+  my $ctlFile = $self->{'_cfg_global'}{'control_file'} ||
              $self->{'_cfg_global'}{'infile'} . ".ctl";
 
   my $fh = new IO::File;
@@ -739,7 +858,7 @@ sub generateControlfile {
   $self->{'_control_file'} = $ctlFile;
 
   return 1;
-}
+} # sub generateControlFile
 
 
 
@@ -747,6 +866,7 @@ sub generateControlfile {
 
 =head2 B<generateSessionClause()>
 
+TODO
 
 =cut
 
@@ -771,6 +891,7 @@ $cfg->{'loadmode'}
 
 =head2 B<generateTablesClause()>
 
+TODO
 
 =cut
 
@@ -838,6 +959,7 @@ sub generateTablesClause {
 
 =head2 B<generateDataClause()>
 
+TODO
 
 =cut
 
@@ -870,9 +992,188 @@ sub generateParfile {
 
 
 
+################################################################################
+
+=head1 Utility Methods
+
+=cut
+
+################################################################################
+
+
+################################################################################
+
+=head2 B<findProgram()>
+
+searches ORACLE_HOME and PATH environment variables for an executable program
+
+=over 2
+
+=item mandatory arguments
+
+=over 2
+
+=item $executable - the name of the program to search for
+
+=back
+
+=back
+
+=cut
+
+################################################################################
+sub findProgram{
+  my $exe = shift;
+  if (exists $ENV{'ORACLE_HOME'}) {
+    return 1 if -x "$ENV{'ORACLE_HOME'}/bin/$exe";
+  }
+
+  foreach (split($Config{'path_sep'}, $ENV{'PATH'})){
+    return 1 if -x "$_/$exe";
+  }
+  return undef;
+} # sub findProgram
+
+
+
+################################################################################
+
+=head2 B<checkEnvironment()>
+
+ensure that ORACLE_HOME is set and that the sqlldr binary is present and
+executable
+
+=cut
+
+################################################################################
+sub checkEnvironment {
+  carp __PACKAGE__."::checkEnvironment: no ORACLE_HOME environment variable set"
+    unless $ENV{'ORACLE_HOME'};
+  carp __PACKAGE__."::checkEnvironment: no ORACLE_SID environment variable set"
+    unless $ENV{'ORACLE_SID'};
+  carp __PACKAGE__."::checkEnvironment: sqlldr doesn't exist or isn't executable"
+    unless findProgram($SQLLDRBIN)
+} # sub checkEnvironment
+
+
+
+
+################################################################################
+
+=head1 Private Methods
+
+=cut
+
+################################################################################
+
+################################################################################
+# setup sane defaults
+################################################################################
+sub _initDefaults {
+  my $self = shift;
+  my %args = @_;
+
+
+  # _cfg_global
+  if ($args{'infile'} eq '*') {
+    # so we're loading inline data; that means that we don't have a sane
+    # default for any of the other file options.
+    $args{'badfile'} ? $self->{'_cfg_global'} = $args{'badfile'} :
+      croak __PACKAGE__,"::_initDefaults: can't guess badfile with inline data";
+
+    $args{'discardfile'} ? $self->{'_cfg_global'} = $args{'discardfile'} :
+      croak __PACKAGE__,"::_initDefaults: can't guess discardfile with inline data";
+
+    $args{'logfile'} ? $self->{'_cfg_global'} = $args{'logfile'} :
+      croak __PACKAGE__,"::_initDefaults: can't guess logfile with inline data";
+
+  }
+  else {
+    $self->{'_cfg_global'}{'badfile'} = $args{'badfile'} ||
+      $args{'infile'} . '.bad';
+    $self->{'_cfg_global'}{'discardfile'} = $args{'discardfile'} ||
+      $args{'infile'} . '.discard';
+    $self->{'_cfg_global'}{'logfile'} = $args{'logfile'} ||
+      $args{'infile'} . '.log';
+  }
+
+  $self->{'_cfg_global'}{'infile'} = $args{'infile'};
+
+  # fix $recordLength, var $bytes
+  $self->{'_cfg_global'}{'recfmt'} = $args{'recfmt'} || '';
+
+  # end of stream terminator. don't bother with defaulting to \n
+  $self->{'_cfg_global'}{'eol'} = $args{'eol'} || '';
+
+  # delimiter?
+  $self->{'_cfg_global'}{'terminated_by'} = $args{'terminated_by'};
+
+  # if not, it's fixed length; do offsets start at position 0 or 1?
+  $self->{_cfg_global}{'offset_from'} = $args{'offset_from'} || 0;
+
+  # are there some sort of enclosing characters, double-quotes perhaps?
+  $self->{'_cfg_global'}{'enclosed_by'} = $args{'enclosed_by'};
+
+  # default to 'all'
+  $self->{'_cfg_global'}{'discardmax'} = $args{'discardmax'} || '';
+
+  # default to 'all'
+  $self->{'_cfg_global'}{'nullcols'} = $args{'nullcols'} ? 'trailing nullcols' : '';
+
+  # default to shutup
+  $self->{'_cfg_global'}{'silent'} = $args{'silent'} ? $args{'silent'} :
+                                    'silent=header,feedback';
+  #  'silent=header,feedback,errors,discards,partitions';
+
+
+  # figure out if we've got username and password arguments. if not, check
+  # ORACLE_USERID for it and see if it's a 'scott/tiger@sid' format
+  if ($args{'username'}) {
+    if (exists $args{'password'}) {
+      $self->{'_cfg_global'}{'userid'} =
+	$args{'username'} . "/" .
+	$args{'password'};
+    }
+    else {
+      croak __PACKAGE__,"::_initDefaults(): must include password with ".
+	"username option";
+    }
+  }
+  # missing auth info. let's see if ORACLE_USERID holds anything useful
+  elsif ($ENV{'ORACLE_USERID'}) {
+    if (($self->{'_cfg_global'}{'username'},
+	 $self->{'_cfg_global'}{'password'},
+	 $self->{'_cfg_global'}{'sid'}) =
+	($ENV{'ORACLE_USERID'} =~ (/(\w+)\/(\w+)[\@(\w+)]?/))) {
+      # great, got a match
+    }
+    else {
+      croak __PACKAGE__,"::_initDefaults: no username argument supplied and ".
+	"ORACLE_USERID environment variable does not contain valid account info";
+    }
+  }
+  else {
+    croak __PACKAGE__,"::_initDefaults: no username argument supplied and ".
+      "ORACLE_USERID environment variable does not contain valid account info";
+  }
+
+  # default the load mode to append
+  $self->{'_cfg_global'}{'loadmode'} = $args{'loadmode'} || $APPEND;
+
+  # cache the last table
+  undef $self->{'_last_table'};
+
+  # do we want to cleanup after ourselves, or leave the files around for
+  # testing or auditing?
+  $self->{'_cleanup'} = exists $args{'cleanup'} ? $args{'cleanup'} : 1;
+
+
+} # sub _initDefaults
+
+
 ###############################################################################
 
-=head2 B<initDescriptions()>
+=head2 B<_initDescriptions()>
 
 this stuff is almost *all* directly from the sqlldr usage dumps
 
@@ -964,61 +1265,6 @@ sub initDescriptions {
 		   );
 } # sub initDescriptions
 
-
-
-
-
-################################################################################
-
-=head2 B<findProgram()>
-
-searches ORACLE_HOME and PATH environment variables for an executable program
-
-=over 2
-
-=item mandatory arguments
-
-=over 2
-
-=item $executable - the name of the program to search for
-
-=back
-
-=back
-
-=cut
-
-################################################################################
-sub findProgram{
-  my $exe = shift;
-  if (exists $ENV{'ORACLE_HOME'}) {
-    return 1 if -x "$ENV{'ORACLE_HOME'}/bin/$exe";
-  }
-
-  foreach (split($Config{'path_sep'}, $ENV{'PATH'})){
-    return 1 if -x "$_/$exe";
-  }
-  return undef;
-}
-
-
-
-################################################################################
-
-=head2 B<checkEnvironment()>
-
-ensure that ORACLE_HOME is set and that the sqlldr binary is present and
-executable
-
-=cut
-
-################################################################################
-sub checkEnvironment {
-  carp __PACKAGE__."::checkEnvironment: no ORACLE_HOME environment variable set"
-    unless $ENV{'ORACLE_HOME'};
-  carp __PACKAGE__."::checkEnvironment: sqlldr doesn't exist or isn't executable"
-    unless findProgram($SQLLDRBIN)
-} # sub checkEnvironment
 
 
 

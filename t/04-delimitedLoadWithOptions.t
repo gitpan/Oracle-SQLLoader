@@ -1,6 +1,6 @@
 #!/bin/env perl -w
 # -*- mode: cperl -*-
-# $Id: 02-delimitedLoadSimple.t,v 1.4 2004/09/05 05:56:02 ezra Exp $
+# $Id: 04-delimitedLoadWithOptions.t,v 1.1 2004/09/05 06:59:40 ezra Exp $
 
 BEGIN {
   unless(grep /blib/, @INC) {
@@ -34,9 +34,6 @@ ok(noDelimiterLoad());
 cleanup();
 
 
-
-
-
 ##############################################################################
 sub generateInputFile {
   open (IN, ">$delimitedFile") || return 0;
@@ -47,10 +44,9 @@ sub generateInputFile {
 #  float_col    number(15,5)
 
   print IN
-"aaaaaaaaaa,aaa,1,102910391.333
-bbbbbbbbbb,bbbb,29,103910131.333
-cccccccccc,ccccc,293,391039131.333
-dddddddddd,dddddd,1932932932,1039131.333";
+"49698431|baufile|49698431          EDITEDITEDITEDIT         8831125                   4731 N 47th Dr                                                                  Phoenix        AZ85031                                                55543882555232835022                    0004771 690.41            12-JUL-0 238.48           13-JUL-04                                                                         29-JUN-04       23-JUL-04                                                                                                                                                                                                                                                                            EDITEDITEDITEDITED             0       97      C000    81
+49703288|baufile|49703288          EDITEDITEDITEDI          11131488                  5091 E Townsend Ave                                                             Fresno         CA93727                                                55543882555232835022                    0144031 1263.35           14-JUL-0 1152.07          01-JUL-04                                                                         29-MAY-04       17-JUL-04                                                                                                                                                                                                                                                                                                           0       0       C000    0
+49705379|baufile|49705379          EDITEDITEDITEDITE        11385432                  4035 West Breckenridge Ct                                                       Beverly Hills  FL34465                                                55543882555232835022                    0166086 2373.33           18-MAY-0 1962.33          01-JUL-04                                                                         07-JUN-04       <Not Avai                                                                                                                                                                                                                                                                                                           0       0       C000    0";
   close IN;
   return 1;
 } # sub generateInputFile
@@ -62,7 +58,7 @@ sub goodLoad {
   my ($user, $pass) = split('/',$ENV{'ORACLE_USERID'});
   my $ldr = new Oracle::SQLLoader(
 				  infile => $delimitedFile,
-				  terminated_by => ',',
+				  terminated_by => '|',
 				  username => $user,
 				  password => $pass,
 				 );
@@ -71,15 +67,15 @@ sub goodLoad {
   $ldr->addTable(table_name => $testTableName);
   $ldr->addColumn(column_name => 'char_col');
   $ldr->addColumn(column_name => 'varchar_col');
-  $ldr->addColumn(column_name => 'int_col');
-  $ldr->addColumn(column_name => 'float_col');
+  $ldr->addColumn(column_name => 'largetext_col',
+		  column_length => 3000);
 
   return 0 unless $ldr->executeLoader();
   return 0 unless $ldr->getNumberSkipped() == 0;
-  return 0 unless $ldr->getNumberRead() == 4;
+  return 0 unless $ldr->getNumberRead() == 3;
   return 0 unless $ldr->getNumberRejected() == 0;
   return 0 unless $ldr->getNumberDiscarded() == 0;
-  return 0 unless $ldr->getNumberLoaded() == 4;
+  return 0 unless $ldr->getNumberLoaded() == 3;
   return 0 unless not defined $ldr->getLastRejectMessage();
 
   # no telling what these are. let's check for defined...

@@ -1,6 +1,6 @@
 #!/bin/env perl -w
 # -*- mode: cperl -*-
-# $Id: 01-createTable.t,v 1.4 2004/09/03 16:14:10 ezra Exp $
+# $Id: 01-createTable.t,v 1.5 2004/09/05 06:59:40 ezra Exp $
 
 BEGIN {
   unless(grep /blib/, @INC) {
@@ -42,6 +42,7 @@ create table $testTableName (
   varchar_col  varchar2(10),
   int_col      number(10),
   float_col    number(15,5),
+  largetext_col varchar2(4000),
   date_col     date
 );\n exit;\n";
   close DDL;

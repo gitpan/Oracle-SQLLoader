@@ -1,4 +1,13 @@
 Revision history for Perl extension Oracle::SQLLoader.
 
-0.01  Wed Sep  1 23:01:44 2004
-    First Release.
+0.1  Wed Sep  1 2004
+  * First Release.
+
+0.2  Friday Sep 3 2004
+  * tons more POD
+  * replace $FLOAT type with $DECIMAL
+  * renamed Oracle::SQLLoader::executeSqlldr to Oracle::SQLLoader::executeLoader
+  * implemented trailing nullcols option
+  * support column_length option to addColumn
+  * get more stats - start/end times as epoch, cpu/elapsed seconds
+  * removed parfile references

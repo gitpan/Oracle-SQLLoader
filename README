@@ -14,9 +14,9 @@ to be loaded. From there, the modules attempts to dwim as best as possible by
 using defaults to all of the various sqlldr options.
 
 The module currently supports the loading of a single table from a single file.
-The file can be either fixed width or delimited. For a delimited file load,
+The file can be either fixed length or delimited. For a delimited file load,
 just add the names of the destination columns in the order the fields appears
-in the data file and optionally supply a data type. For a fixed width load,
+in the data file and optionally supply a data type. For a fixed length load,
 supply the destination column name; the combination of the field starting
 offset and field length, or the field start and end offsets in the data file;
 and an optional data type.
@@ -53,7 +53,7 @@ You should have the following environment variables set:
 
 COPYRIGHT AND LICENSE
 
-The Oracle::SQLLoader module is Copyright (c) 2004 Ezra Pagel.
+The Oracle::SQLLoader module is Copyright (c) 2004 Ezra Pagel <ezra@cpan.org>.
 
 The Oracle::SQLLoader module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself, either Perl version 5.8.4 or,
@@ -65,7 +65,7 @@ THOUGHTS
 I tried to keep this module as simple as possible. It does what I want it to
 do, but your definition of "most commonly used functionality" may differ from
 mine by quite a bit. I find myself repeating the same tasks regularly, and 90%
-of the time I'm just loading a single table from a fixed width file and don't
+of the time I'm just loading a single table from a fixed length file and don't
 feel like looking up the exact sqlldr syntax. The SQL*Loader utility, like most
 things Oracle, is exteremely well documented, so the I don't see the point in
 using a module to generate sqlldr control and parameter files if you've got to
@@ -77,4 +77,4 @@ file, but in the event that I do, I'll add it to the module; patches and
 contributions welcome!
 
 
-$Id: README,v 1.5 2004/09/03 17:12:44 ezra Exp $
+$Id: README,v 1.7 2004/09/04 03:44:48 ezra Exp $
