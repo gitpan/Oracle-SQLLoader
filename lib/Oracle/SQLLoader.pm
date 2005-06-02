@@ -1,5 +1,5 @@
 # -*- mode: cperl -*-
-# $Id: SQLLoader.pm,v 1.39 2005/02/16 06:31:20 ezra Exp $
+# $Id: SQLLoader.pm,v 1.41 2005/06/02 02:36:58 ezra Exp $
 
 =head1 NAME
 
@@ -153,7 +153,7 @@ use vars qw/@ISA
 
 
 
-$VERSION = '0.5';
+$VERSION = '0.6';
 @ISA = qw/Exporter/;
 @EXPORT_OK = qw/$CHAR $INT $DECIMAL $DATE $APPEND $TRUNCATE $REPLACE $INSERT/;
 
@@ -622,8 +622,7 @@ sub checkLogfile {
     $self->{'_stats'}{'rejected'} = undef;
     $self->{'_stats'}{'discarded'} = undef;
     $self->{'_stats'}{'loaded'} = undef;
-    $log->close;
-    return;
+    return undef;
   }
 
   # skip the first line, check the second for the SQL*Loader declaration
