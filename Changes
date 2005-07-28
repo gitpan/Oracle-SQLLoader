@@ -35,3 +35,7 @@ Revision history for Perl extension Oracle::SQLLoader.
 
 0.6  2005-06-01
   * removed bad close call on undefined filehandle, pointed out by Eric von Kuegelgen
+
+07 2005-07-24
+  * first run of test cases failed due to drop of nonexistent table
+  * doc fix - 'cleanup' option

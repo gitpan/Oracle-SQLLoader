@@ -1,5 +1,5 @@
 # -*- mode: cperl -*-
-# $Id: SQLLoader.pm,v 1.41 2005/06/02 02:36:58 ezra Exp $
+# $Id: SQLLoader.pm,v 1.43 2005/07/28 03:10:23 ezra Exp $
 
 =head1 NAME
 
@@ -153,7 +153,7 @@ use vars qw/@ISA
 
 
 
-$VERSION = '0.6';
+$VERSION = '0.7';
 @ISA = qw/Exporter/;
 @EXPORT_OK = qw/$CHAR $INT $DECIMAL $DATE $APPEND $TRUNCATE $REPLACE $INSERT/;
 
@@ -324,7 +324,7 @@ the load (default 50)
 
 =item I<enclosed_by> - are there some sort of enclosing characters, double-quotes perhaps?
 
-=item I<nocleanup> - want to leave the load files on disk, maybe for
+=item I<cleanup> - want to leave the load files on disk, maybe for
 testing/auditing?
 
 =back

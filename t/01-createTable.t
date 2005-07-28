@@ -1,6 +1,6 @@
 #!/bin/env perl -w
 # -*- mode: cperl -*-
-# $Id: 01-createTable.t,v 1.8 2005/02/16 06:30:49 ezra Exp $
+# $Id: 01-createTable.t,v 1.9 2005/07/28 03:09:35 ezra Exp $
 
 BEGIN {
   unless(grep /blib/, @INC) {
@@ -56,8 +56,7 @@ sub createTable {
   my $exe = "$sqlplus $userId \@$testTableName.sql";
   print "Creating table with command \"$exe\"\n";
   my $resLog = `$exe`;
-  return 1 if $resLog =~ /Table dropped\./ &&
-              $resLog =~ /Table created\./;
+  return 1 if $resLog =~ /Table created\./;
   return 0;
 }
 
