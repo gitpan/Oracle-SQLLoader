@@ -1,6 +1,6 @@
 #!/bin/env perl -w
 # -*- mode: cperl -*-
-# $Id: 04-delimitedLoadWithOptions.t,v 1.3 2004/09/11 04:42:20 ezra Exp $
+# $Id: 04-delimitedLoadWithOptions.t,v 1.3 2004-09-11 04:42:20 ezra Exp $
 
 BEGIN {
   unless(grep /blib/, @INC) {

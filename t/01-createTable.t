@@ -1,6 +1,6 @@
 #!/bin/env perl -w
 # -*- mode: cperl -*-
-# $Id: 01-createTable.t,v 1.9 2005/07/28 03:09:35 ezra Exp $
+# $Id: 01-createTable.t,v 1.9 2005-07-28 03:09:35 ezra Exp $
 
 BEGIN {
   unless(grep /blib/, @INC) {

@@ -7,5 +7,7 @@ t/01-createTable.t
 t/02-delimitedLoadSimple.t
 t/03-fixedLoadSimple.t
 t/04-delimitedLoadWithOptions.t
+t/05-fixedLoadWhenClause.t
+t/06-delimitedSingleRecord.t
 TODO
 META.yml                                 Module meta-data (added by MakeMaker)

@@ -1,6 +1,6 @@
 #!/bin/env perl -w
 # -*- mode: cperl -*-
-# $Id: 03-fixedLoadSimple.t,v 1.6 2004/09/11 04:48:02 ezra Exp $
+# $Id: 03-fixedLoadSimple.t,v 1.6 2004-09-11 04:48:02 ezra Exp $
 
 BEGIN {
   unless(grep /blib/, @INC) {

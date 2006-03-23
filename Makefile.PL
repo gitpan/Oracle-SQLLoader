@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.5 2004/09/06 21:44:55 ezra Exp $
+# $Id: Makefile.PL,v 1.5 2004-09-06 21:44:55 ezra Exp $
 # -*- mode: cperl -*-
 
 use 5.00503;

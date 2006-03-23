@@ -47,10 +47,7 @@ sub generateInputFile {
 #  float_col    number(15,5)
 
   print IN
-"aaaaaaaaaa,aaa,1,102910391.333
-bbbbbbbbbb,bbbb,29,103910131.333
-cccccccccc,ccccc,293,391039131.333
-dddddddddd,dddddd,1932932932,1039131.333";
+"aaaaaaaaaa,aaa,1,102910391.333";
   close IN;
   return 1;
 } # sub generateInputFile
@@ -76,10 +73,10 @@ sub goodLoad {
 
   return 0 unless $ldr->executeLoader();
   return 0 unless $ldr->getNumberSkipped() == 0;
-  return 0 unless $ldr->getNumberRead() == 4;
+  return 0 unless $ldr->getNumberRead() == 1;
   return 0 unless $ldr->getNumberRejected() == 0;
   return 0 unless $ldr->getNumberDiscarded() == 0;
-  return 0 unless $ldr->getNumberLoaded() == 4;
+  return 0 unless $ldr->getNumberLoaded() == 1;
   return 0 unless not defined $ldr->getLastRejectMessage();
 
   # no telling what these are. let's check for defined...
@@ -103,10 +100,7 @@ sub generateNoDelimiterLoadFile {
 #  float_col    number(15,5)
 
   print IN
-"aaaaaaaaaaa       aaa         11029391039131.333
-bbbbbbbbbbb      bbbb        291029391039131.333
-ccccccccccc     ccccc       2931029391039131.333
-ddddddddddd    dddddd19329329321029391039131.333";
+"aaaaaaaaaaa       aaa         11029391039131.333";
   close IN;
   return 1;
 } # sub generateNoDelimiterLoadFile
@@ -135,8 +129,8 @@ sub noDelimiterLoad {
 
   # stats
   return 0 unless $ldr->getNumberSkipped() == 0;
-  return 0 unless $ldr->getNumberRead() == 4;
-  return 0 unless $ldr->getNumberRejected() == 4;
+  return 0 unless $ldr->getNumberRead() == 1;
+  return 0 unless $ldr->getNumberRejected() == 1;
   return 0 unless $ldr->getNumberDiscarded() == 0;
   return 0 unless $ldr->getNumberLoaded() == 0;
   return 0 unless $ldr->getLastRejectMessage() eq

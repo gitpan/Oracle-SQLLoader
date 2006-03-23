@@ -1,5 +1,5 @@
 # -*- mode: cperl -*-
-# $Id: SQLLoader.pm,v 1.43 2005/07/28 03:10:23 ezra Exp $
+# $Id: SQLLoader.pm,v 1.43 2005-07-28 03:10:23 ezra Exp $
 
 =head1 NAME
 
@@ -153,7 +153,7 @@ use vars qw/@ISA
 
 
 
-$VERSION = '0.7';
+$VERSION = '0.8';
 @ISA = qw/Exporter/;
 @EXPORT_OK = qw/$CHAR $INT $DECIMAL $DATE $APPEND $TRUNCATE $REPLACE $INSERT/;
 
@@ -654,7 +654,7 @@ sub checkLogfile {
     elsif (/Total logical records discarded:\s+(\d+)/) {
       $self->{'_stats'}{'discarded'} = $1;
     }
-    elsif (/(\d+) Rows successfully loaded\./) {
+    elsif (/(\d+) Rows? successfully loaded\./) {
       $self->{'_stats'}{'loaded'} = $1;
     }
     elsif (/Record\s\d+:\s+Rejected\s+\-\s+/) {

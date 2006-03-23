@@ -39,3 +39,7 @@ Revision history for Perl extension Oracle::SQLLoader.
 07 2005-07-24
   * first run of test cases failed due to drop of nonexistent table
   * doc fix - 'cleanup' option
+
+08 2006-03-21
+  * John Huckelba pointed out that single-record load results caused log parsing to fail; fixed and added test case
+  * added tests for when_clause, check number discarded
