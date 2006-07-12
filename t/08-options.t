@@ -11,11 +11,11 @@ BEGIN {
 
 use Oracle::SQLLoader;
 use strict;
-use Test;
+use Test::More;
 use Cwd;
 
 BEGIN {
- plan tests => 2
+ plan tests => 16
 }
 
 
@@ -23,13 +23,33 @@ my $testTableName = "SQLLOADER_TEST_TABLE";
 my $delimitedFile = getcwd() . "/$testTableName.csv";
 
 
-ok(generateInputFile());
+ok(generateInputFile(), 'generate input file');
 
-ok(whenClauseLoad());
+my %tests = (
+             bindsize  => 256000,
+             columnarrayrows => 5000,
+             direct => 'false',
+             discardmax => 500,
+             errors => 50,
+             load => 10,
+             multithreading => 'false',
+             parallel => 'false',
+             readsize => 0,
+             rows => 64,
+             skip => 0,
+             skip_index_maintenance => 'false',
+             skip_unusable_indexes => 'false',
+             streamsize => 256000,
+             silent => 'ALL',
+            );
+
+foreach my $key (sort keys %tests) {
+  my $val = $tests{$key};
+  ok(loadOption($key, $val), "$key = $val");
+}
+
 
 cleanup();
-
-
 
 
 
@@ -54,29 +74,31 @@ dddddddddd,dddddd,1932932932,1039131.333";
 
 
 ##############################################################################
-sub whenClauseLoad {
+sub loadOption {
   my ($user, $pass) = split('/',$ENV{'ORACLE_USERID'});
+  my ($option, $value) = @_;
   my $ldr = new Oracle::SQLLoader(
 				  infile => $delimitedFile,
 				  terminated_by => ',',
 				  username => $user,
 				  password => $pass,
-				 );
+                                  $option => $value,
+                                 );
 
+  return 0 unless $ldr->{'_cfg_global'}{$option} eq $value;
 
-  $ldr->addTable(table_name => $testTableName,
-		 when_clauses => "WHEN (01) <> 'c' and (01) <> 'd'");
+  $ldr->addTable(table_name => $testTableName);
   $ldr->addColumn(column_name => 'char_col');
   $ldr->addColumn(column_name => 'varchar_col');
   $ldr->addColumn(column_name => 'int_col');
   $ldr->addColumn(column_name => 'float_col');
 
-  $ldr->executeLoader();
+  return 0 unless $ldr->executeLoader();
   return 0 unless $ldr->getNumberSkipped() == 0;
   return 0 unless $ldr->getNumberRead() == 4;
   return 0 unless $ldr->getNumberRejected() == 0;
-  return 0 unless $ldr->getNumberDiscarded() == 2;
-  return 0 unless $ldr->getNumberLoaded() == 2;
+  return 0 unless $ldr->getNumberDiscarded() == 0;
+  return 0 unless $ldr->getNumberLoaded() == 4;
   return 0 unless not defined $ldr->getLastRejectMessage();
 
   # no telling what these are. let's check for defined...
@@ -87,7 +109,7 @@ sub whenClauseLoad {
 
   # yay.
   return 1;
-} # sub whenClauseLoad
+} # sub loadOption
 
 
 ##############################################################################

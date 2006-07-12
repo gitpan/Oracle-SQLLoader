@@ -9,5 +9,7 @@ t/03-fixedLoadSimple.t
 t/04-delimitedLoadWithOptions.t
 t/05-fixedLoadWhenClause.t
 t/06-delimitedSingleRecord.t
+t/07-directDelimitedLoadSimple.t
+t/08-options.t
 TODO
 META.yml                                 Module meta-data (added by MakeMaker)

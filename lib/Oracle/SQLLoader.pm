@@ -33,6 +33,7 @@ stats and return codes by parsing the sqlldr output.
  				terminated_by => ',',
  				username => $user,
  				password => $pass,
+                                sid => $sid
  			       );
 
   $ldr->addTable(table_name => 'test_table');
@@ -117,13 +118,23 @@ stats and return codes by parsing the sqlldr output.
 
 Ezra Pagel <ezra@cpan.org>
 
+=head1 CONTRIBUTIONS
+
+John Huckelba - fix for single record files scenario
+
+Craig Pearlman <cpearlman@healthmarketscience.com> - added various fixes, most
+importantly initializing and generating the options clause correctly.
+
 =head1 COPYRIGHT
 
-The Oracle::SQLLoader module is Copyright (c) 2004 Ezra Pagel.
+The Oracle::SQLLoader module is Copyright (c) 2006 Ezra Pagel.
 
 The Oracle::SQLLoader module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself, either Perl version 5.8.4 or,
 at your option, any later version of Perl 5 you may have available.
+
+Modifications to Oracle::SQLLoader are Copyright (c) 2006 Health Market Science,
+though this code remains free under the terms of the original license.
 
 SQL*Loader is Copyright (c) 1982, 2002, Oracle Corporation.  All rights reserved.
 
@@ -152,11 +163,20 @@ use vars qw/@ISA
             $INSERT/;
 
 
-
-$VERSION = '0.8';
+$VERSION = '0.9';
 @ISA = qw/Exporter/;
 @EXPORT_OK = qw/$CHAR $INT $DECIMAL $DATE $APPEND $TRUNCATE $REPLACE $INSERT/;
 
+our %OPTS = map { $_, 1 } qw/bindsize columnarrayrows direct discardmax
+                             errors load readsize resumable rows silent
+                             skip streamsize/;
+
+our %BOOL_OPTS = map { $_, 1 } qw/direct multithreading parallel
+                                  skip_index_maintenance skip_unusable_indexes/;
+
+our %OPT_DEFAULTS;
+
+#initDefaults();
 
 ################################################################################
 
@@ -273,6 +293,9 @@ create a new Oracle::SQLLoader object
 
 =over 2
 
+=item I<control_file> - supply an explicit file name to use when
+generating the control file; useful when I<cleanup> is set to false.
+
 =item I<terminated_by> - if you're planning on loading a delimited file,
 just provide the character used as a delimiter and Oracle::SQLLoader will
 presume that it's a delimited load from here on out. if this option is not
@@ -288,7 +311,7 @@ $TRUNCATE (default $APPEND)
 
 =back
 
-=item other optional arguments - you can safely accept the defaults and
+=item other optional arguments - you can ususally accept the defaults and
 pretend that these don't exist.
 
 =over 2
@@ -302,23 +325,23 @@ I<readsize> (default 256000)
 =item I<errors> - the maximum number of errors to accept before failing
 the load (default 50)
 
-=item I<load> - the maximum number of records to load
+=item I<load> - the maximum number of records to load (default ALL)
 
-=item I<rows> - the number of rows to load before committing
+=item I<rows> - the number of rows to load before committing (default 64)
 
-=item I<skip> - the number of records to skip
+=item I<skip> - the number of records to allow to be skipped (default 0)
 
-=item I<skip_index_maintenance> - for direct loads, don't rebuild indexes
+=item I<skip_index_maintenance> - for direct loads, don't rebuild indexes (default false)
 
-=item I<skip_unusable_indexes> - skips rebuilding unusable indexes
+=item I<skip_unusable_indexes> - skips rebuilding unusable indexes (default false)
 
-=item I<streamsize> - (direct) the byte size of the load stream
+=item I<streamsize> - (direct) the byte size of the load stream (default 256000)
 
-=item I<badfile> - 
+=item I<badfile> -
 
 =item I<discardfile> -
 
-=item I<eol> - 
+=item I<eol> -
 
 =item I<offset_from> - do your offsets start at position 0 or 1
 
@@ -336,14 +359,6 @@ testing/auditing?
 ################################################################################
 sub new {
   my ($class, %args) = @_;
-
-  my %opts = (
-	      bindsize => 256000,
-	     );
-
-
-
-
 
   croak __PACKAGE__."::new: missing mandatory argument 'infile'"
     unless exists $args{'infile'};
@@ -561,11 +576,10 @@ sub executeLoader {
   my $exe = $ENV{'ORACLE_HOME'}."/bin/$SQLLDRBIN";
   my $cmd = "$exe control=$self->{'_control_file'} ".
             "userid=$self->{'_cfg_global'}{'userid'} ".
-            "log=$self->{'_cfg_global'}{'logfile'} ".
-	    "$self->{'_cfg_global'}{'silent'} 2>&1";
+            "log=$self->{'_cfg_global'}{'logfile'} 2>&1";
+
   my $output = `$cmd`;
   my $exitval = $? / 256;
-
 
   $self->checkLogfile();
 
@@ -582,7 +596,7 @@ sub executeLoader {
     unlink $self->{'_cfg_global'}{'logfile'};
   }
 
-  return ! $exitval;
+  return !$exitval;
 } # sub executeLoader
 
 
@@ -950,7 +964,7 @@ sub generateControlfile {
 
 
 
-  $self->{'_control_text'} = 
+  $self->{'_control_text'} =
     $self->_generateSessionClause().
     $self->_generateTablesClause().
     $self->_generateDataClause();
@@ -1004,7 +1018,7 @@ $ldr->findProgram('sqlldr.exe')
 
 ################################################################################
 sub findProgram {
-  my $argclass = shift;   
+  my $argclass = shift;
   my $exe = shift;
   my $class = ref($argclass) || $argclass;
 
@@ -1092,6 +1106,29 @@ sub _initDefaults {
 
   $self->{'_cfg_global'}{'infile'} = $args{'infile'};
 
+
+  # only accept legal keys as config values
+  foreach my $key (keys %OPTS) {
+    $self->{'_cfg_global'}{$key} = $args{$key} if exists $args{$key};
+  }
+
+  foreach my $key (keys %BOOL_OPTS) {
+    if (exists $args{$key}) {
+      if ($args{$key} =~ /0|false/i) {
+        $self->{'_cfg_global'}{$key} = 'false';
+      }
+      elsif ($args{$key} =~ /1|true/i) {
+        $self->{'_cfg_global'}{$key} = 'true';
+      }
+      else {
+        carp __PACKAGE__,"::_initDefaults: invalid value \"$args{$key}\"".
+          " for option \"$key\"";
+      }
+    }
+  }
+
+
+
   # fix $recordLength, var $bytes
   $self->{'_cfg_global'}{'recfmt'} = $args{'recfmt'} || '';
 
@@ -1102,20 +1139,31 @@ sub _initDefaults {
   $self->{'_cfg_global'}{'terminated_by'} = $args{'terminated_by'};
 
   # if not, it's fixed length; do offsets start at position 0 or 1?
-  $self->{_cfg_global}{'offset_from'} = $args{'offset_from'} || 0;
+  $self->{_cfg_global}{'offset_from'} = exists $args{'offset_from'} ?
+    $args{'offset_from'} : 0;
 
   # are there some sort of enclosing characters, double-quotes perhaps?
   $self->{'_cfg_global'}{'enclosed_by'} = $args{'enclosed_by'};
 
-  # default to 'all'
-  $self->{'_cfg_global'}{'discardmax'} = $args{'discardmax'} || '';
+
+  # handle 0 or 'false', 1 or 'true'
+  if (exists $args{'direct'}) {
+    if (!$args{'direct'} || $args{'direct'} =~ /false/i) {
+      $self->{'_cfg_global'}{'direct'} = 'false';
+    }
+    else {
+      $self->{'_cfg_global'}{'direct'} = 'true';
+    }
+  }
+  else {
+    $self->{'_cfg_global'}{'direct'} = $OPT_DEFAULTS{'direct'};
+  }
 
   # default to 'all'
   $self->{'_cfg_global'}{'nullcols'} = $args{'nullcols'} ? 'trailing nullcols' : '';
 
   # default to shutup
-  $self->{'_cfg_global'}{'silent'} = $args{'silent'} ? $args{'silent'} :
-                                    'silent=header,feedback';
+  $self->{'_cfg_global'}{'silent'} = $args{'silent'} ? $args{'silent'} : 'header,feedback';
 #    'silent=header,feedback,errors,discards,partitions';
 
 
@@ -1199,13 +1247,29 @@ sub _generateSessionClause {
   my $self = shift;
   my $cfg = $self->{'_cfg_global'};
   $cfg->{'fixed'} ||= '';
-  my $text = "
+
+
+  # TBD
+  #-- RESUMABLE = {TRUE | FALSE}
+  #-- RESUMABLE_NAME = 'text string'
+  #-- RESUMABLE_TIMEOUT = n
+  #-- SKIP_INDEX_MAINTENANCE = {TRUE | FALSE}
+  #-- SKIP_UNUSABLE_INDEXES = {TRUE | FALSE}
+
+
+  my $text = <<EndText;
+OPTIONS (
+    SILENT=(\U$cfg->{'silent'}\E)
+
+)
 LOAD DATA
-INFILE '$cfg->{'infile'}' $cfg->{'fixed'}
-BADFILE '$cfg->{'badfile'}'
-DISCARDFILE '$cfg->{'discardfile'}'
+    INFILE '$cfg->{'infile'}' $cfg->{'fixed'}
+    BADFILE '$cfg->{'badfile'}'
+    DISCARDFILE '$cfg->{'discardfile'}'
 $cfg->{'loadmode'}
-";
+EndText
+
+  chomp $text; # remove extra \n
 
   return $text;
 } # sub _generateSessionClause
@@ -1297,75 +1361,39 @@ sub _generateDataClause {
 
 ###############################################################################
 
-=head3 B<_initDescriptions()>
+=head3 B<initDefaults()>
 
-this stuff is almost *all* directly from the sqlldr usage dumps
+the loader defaults are almost directly from the sqlldr usage dumps
 
 =cut
 
 ###############################################################################
-sub initDescriptions {
-#-- BINDSIZE = n
-#-- COLUMNARRAYROWS = n
-#-- DIRECT = {TRUE | FALSE} 
-#-- ERRORS = n
-#-- LOAD = n 
-#-- MULTITHREADING = {TRUE | FALSE}
-#-- PARALLEL = {TRUE | FALSE}
-#-- READSIZE = n
-#-- RESUMABLE = {TRUE | FALSE}
-#-- RESUMABLE_NAME = 'text string'
-#-- RESUMABLE_TIMEOUT = n
-#-- ROWS = n 
-#-- SILENT = {HEADERS | FEEDBACK | ERRORS | DISCARDS | PARTITIONS | ALL} 
-#-- SKIP = n   
-#-- SKIP_INDEX_MAINTENANCE = {TRUE | FALSE}
-#-- SKIP_UNUSABLE_INDEXES = {TRUE | FALSE}
-#-- STREAMSIZE = n
+sub unused_initDefaults {
 
-  my  %loaderDefaults = (
-			 bindsize => 0,
-			 columnarrayrows => 0,
-			 direct => 'false',
-			 errors => 0,
-			 load => 0,
-			 multithreading => 'false',
-			 parallel => 'false',
-			 readsize => 0,
-			 resumable => 'false',
-			 resumable_name => 'text string',
-			 resumable_timeout => 0,
-			 rows => 'n ',
-			 silent => ['headers',
-				    'feedback',
-				    'errors',
-				    'discards',
-				    'partitions',
-				    'all'],
-			 skip => 0,
-			 skip_index_maintenance => 'false',
-			 skip_unusable_indexes => 'false',
-			 streamsize => 0,
-		    );
-
-  my %optDefaults = (
-		     bad => 'Bad file name',
-		     data => 'Data file name',
-		     discard => 'Discard file name',
-		     discardmax => 'all',
-		     skip => 0,
-		     load => 'all',
-		     errors => 50,
-		     rows_direct => 'all',
-		     rows_conventional => 64,
-		     rows => 64,
-		     bindsize => 256000,
-		     silent => '',
-		     direct => 0,
-		     parfile => '',
-		     parallel => 0,
-		     file => '',
-		    );
+  %OPT_DEFAULTS = (
+                   bindsize => 256000,
+                   columnarrayrows => 5000,
+                   direct => 'false',
+#                   discardmax => 'all',
+                   errors => 50,
+#                   load => 'all',
+                   multithreading => 'false',
+                   parallel => 'false',
+                   parfile => '',
+                   readsize => 0,
+                   resumable => 'false',
+                   resumable_name => 'text string',
+                   resumable_timeout => 0,
+                   rows_direct => 'all',
+                   rows_conventional => 64,
+                   rows => 64,
+                   skip => 0,
+                   skip_index_maintenance => 'false',
+                   skip_unusable_indexes => 'false',
+                   streamsize => 256000,
+                   silent => '',
+                   file => '',
+                  );
 
 
   my %optDescrip = (

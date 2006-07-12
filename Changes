@@ -43,3 +43,7 @@ Revision history for Perl extension Oracle::SQLLoader.
 08 2006-03-21
   * John Huckelba pointed out that single-record load results caused log parsing to fail; fixed and added test case
   * added tests for when_clause, check number discarded
+
+09 2006-06-22
+  * Craig Pearlman contributed quite a few fixes, including getting options to behave properly
+  * added tests for direct loads

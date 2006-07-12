@@ -31,6 +31,7 @@ Oracle::SQLLoader has been successfully tested on the following platforms:
 * Oracle 9.2.1.0 on Solaris 8 and 9
 * Oracle 9.2.1.0 on Debian GNU/Linux testing
 * Oracle 10.1.0.2 on Windows XP and Enterprise Server 2003
+* Oracle 10.2.0 on RHEL4
 
 If you try this module on any other platforms, any success or failure report
 would be greatly appreciated.
@@ -56,13 +57,20 @@ You should have the following environment variables set:
   ORACLE_USERID - the username and password to connect to the database as; the
                   format is username/password (e.g. scott/tiger)
 
+Before executing, ensure remote connectivity by executing `tnsping $ORACLE_SID`.
+
 COPYRIGHT AND LICENSE
 
-The Oracle::SQLLoader module is Copyright (c) 2004 Ezra Pagel <ezra@cpan.org>.
+The Oracle::SQLLoader module is Copyright (c) 2006 Ezra Pagel.
 
 The Oracle::SQLLoader module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself, either Perl version 5.8.4 or,
 at your option, any later version of Perl 5 you may have available.
+
+Modifications to Oracle::SQLLoader are Copyright (c) 2006 Health Market Science,
+though this code remains free under the terms of the original license.
+
+SQL*Loader is Copyright (c) 1982, 2002, Oracle Corporation.  All rights reserved.
 
 
 THOUGHTS
@@ -80,6 +88,11 @@ This module will never support every obscure option that sqlldr offers. It's
 highly unlikely that I'll ever find myself loading LOBs from an auxillary
 file, but in the event that I do, I'll add it to the module; patches and
 contributions welcome!
+
+CONTRIBUTIONS
+
+Craig Pearlman <cpearlman@healthmarketscience.com> added various fixes, most
+importantly initializing and generating the options clause correctly.
 
 
 $Id: README,v 1.9 2004-09-06 21:58:28 ezra Exp $

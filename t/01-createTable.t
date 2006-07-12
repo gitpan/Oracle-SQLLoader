@@ -52,7 +52,8 @@ create table $testTableName (
 
 sub createTable {
   return 0 unless exists $ENV{'ORACLE_USERID'};
-  my $userId = $ENV{'ORACLE_USERID'};
+  return 0 unless exists $ENV{'ORACLE_SID'};
+  my $userId = $ENV{'ORACLE_USERID'}. '@' .$ENV{'ORACLE_SID'};
   my $exe = "$sqlplus $userId \@$testTableName.sql";
   print "Creating table with command \"$exe\"\n";
   my $resLog = `$exe`;
